@@ -71,10 +71,12 @@ The word is the verdict, the number is P(yes). Exit `0` means yes, `1` no, `3` u
 A batch prints a readable table, one row per input, in order. Asking again is free: jevx keeps the model's answer, so a repeat returns in milliseconds and costs nothing.
 
 ```console
+$ printf '%s\n' '2026-09-27 10:03:12 INFO  request served /checkout 200 in 84ms' \
+    '2026-09-27 10:03:40 ERROR payment gateway timeout after 30s (order 4021)' > app.log
 $ jevx ask --lines app.log --noul err="Is this an error?"
 VERDICT  P     INPUT
-no       0.05  2026-09-27 10:03:12 INFO  request served /checkout 200 in 84ms
-yes      0.81  2026-09-27 10:03:40 ERROR payment gateway timeout after 30s (order 4021)
+no       0.02  2026-09-27 10:03:12 INFO  request served /checkout 200 in 84ms
+yes      0.99  2026-09-27 10:03:40 ERROR payment gateway timeout after 30s (order 4021)
 
 $ jevx ask --lines app.log --noul err="Is this an error?" --fresh    # ask the model again
 $ jevx cache disable                                                  # or: enable · ttl DAYS · dir PATH · clear
