@@ -72,13 +72,17 @@ func askChunks(p core.Profile, state string, qs map[string]core.Question, set co
 		dir = cacheDir
 	}
 	var miss []string
+	hit := map[string]any{}
 	for _, k := range keys(qs) {
 		hashes[k] = core.CacheKey(p, state, qs[k].Wire())
 		if a, m, ok := core.CacheGet(dir, hashes[k], ttl); ok {
-			out[k], model = a, m
+			out[k], model, hit[k] = a, m, qs[k].Wire()
 			continue
 		}
 		miss = append(miss, k)
+	}
+	if len(hit) > 0 { // a cached hosted answer was given on redacted text: say so, as a fresh call would
+		core.NoteRedacted(core.Redactions(p, state, hit))
 	}
 	for i := 0; i < len(miss); i += *set.Chunk {
 		part := map[string]any{}

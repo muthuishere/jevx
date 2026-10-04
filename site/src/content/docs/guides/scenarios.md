@@ -4,7 +4,7 @@ description: Real situations a coding agent meets, the jevx call it makes, the e
 ---
 
 :::note[Real output]
-Every answer on this page came from hosted Jev (`jev-1.13.0`) on 2026-09-27, unedited, including the ones that came back unsure. A smaller or self-hosted model can answer differently.
+Every answer on this page came from hosted Jev (`jev-1.13.0`) on 2026-10-04, unedited, including the ones that came back unsure. The same call can move by a few hundredths between runs (up to 0.04 on this page); the verdicts held. A smaller or self-hosted model can answer differently.
 :::
 
 ## Scenarios
@@ -43,8 +43,8 @@ The agent searched a help centre for refunds and wants to open only the best hit
 
 ```console
 $ jevx rank "Does this page answer: how do I get my money back?" --top 3 < results.txt
-0.67  Cancelling a subscription and getting money back
-0.61  Refund policy for annual plans
+0.65  Cancelling a subscription and getting money back
+0.60  Refund policy for annual plans
 0.05  Pricing of the enterprise plan
 ```
 
@@ -79,7 +79,7 @@ Tests pass and the user earlier said "ship it once tests pass". Push now, or sto
 ```console
 $ jevx pick "What would the user want the agent to do next?" push="push to main now" ask="stop and ask first" \
   --in "User said: ship it once tests pass. Tests: 214 passed, 0 failed. Branch: main is protected by CI."
-push 0.86
+push 0.89
 ```
 
 **Next:** Pushes and says so in its report ("jevx: push 0.86"). Below 0.6 confidence (exit 3) it would ask instead.
@@ -112,9 +112,9 @@ Bug report: payment timeouts. Six candidate files from the tree.
 
 ```console
 $ jevx rank "Is this file likely where a payment gateway timeout is handled?" --top 3 < files.txt
-0.65  internal/payments/retry.go
+0.64  internal/payments/retry.go
 0.61  internal/payments/gateway.go
-0.24  cmd/server/main.go
+0.26  cmd/server/main.go
 ```
 
 **Next:** Reads retry.go and gateway.go first.
@@ -126,10 +126,10 @@ Four CI failures. Fix real bugs first, re-run the flaky ones.
 ```console
 $ jevx ask --lines tests.txt --choice kind="Is this test failure a flaky test or a real bug?|flaky=timing, network or environment, passes on retry;bug=wrong result or crash in the code" \
   | awk 'NR>1 {print $1, $2}'
-bug 0.93
-flaky 1.00
+bug 0.98
+flaky 0.91
 bug 1.00
-flaky 0.97
+flaky 1.00
 ```
 
 **Next:** Fixes the rounding bug (line 1) and the nil pointer (line 3); re-runs the timeout and websocket tests.
@@ -144,7 +144,7 @@ $ jevx ask --lines reviews.txt --choice kind="What kind of review comment is thi
 nit 1.00
 must 1.00
 none 1.00
-should 1.00
+should 0.98
 none 1.00
 must 1.00
 ```
@@ -181,10 +181,11 @@ About to write a config file to disk or into a commit.
 
 ```console
 $ jevx is "Does this line contain a password?" --in "DATABASE_URL=postgres://app:Pr0d-p4ss@db.internal:5432/app"
-yes 0.99
+jevx: redacted 1 item(s) (a secret, email or phone number) before this call to a hosted endpoint, so the model judged the text without them. The redaction itself means one was there; to judge the raw text, use a local endpoint.
+unsure 0.66
 ```
 
-**Next:** Replaces the value with an environment variable reference before writing.
+**Next:** Treats the redaction notice as the answer: a secret is there, so it replaces the value with an environment variable reference before writing. jevx scrubs secrets, emails and phone numbers before any call to a hosted endpoint, so the model never sees the password and cannot say yes; the notice (stderr, values never printed) is the signal. To have the model judge the raw text, ask a local endpoint (`--profile local`).
 
 ### Did the build succeed?
 
@@ -217,9 +218,9 @@ Urgency, owner and severity of one message, one request.
 $ echo "Checkout is down, customers are being charged twice" \
   | jevx ask --noul urgent="Is this urgent?" --choice team="Which team?|web=frontend;api=backend;billing=payments" \
     --score sev="How severe?|low;medium;high"
-sev              high       0.98
-team             billing    0.99
-urgent           yes        0.97
+sev              high       0.99
+team             billing    0.98
+urgent           yes        0.96
 ```
 
 **Next:** Pages the billing on-call.
@@ -244,34 +245,34 @@ It prints `accept`, `wanted more`, `reaction` and `satisfaction` for the turn.
 
 ```console
 $ jevx is "Would this command delete data that cannot be easily recovered?" --in "git push --force origin main"
-unsure 0.54
+unsure 0.50
 
 $ jevx is "Does this command overwrite history on a shared remote branch?" --in "git push --force origin main"
 yes 0.96
 ```
 
-"Delete data" is vague for a force push; "overwrite history on a shared branch" is exactly the risk. Adding context alone ("main is the shared branch the whole team pulls from") did not help here: still `unsure 0.48`.
+"Delete data" is vague for a force push; "overwrite history on a shared branch" is exactly the risk. Adding context alone ("main is the shared branch the whole team pulls from") did not help here: still `unsure 0.53`.
 
 ### Name the thing you are looking for
 
 ```console
-$ jevx is "Does this content contain a real credential, token or private key?" --in "DATABASE_URL=postgres://app:Pr0d-p4ss@db.internal:5432/app"
-unsure 0.79
+$ jevx is "Is this command dangerous?" --in "rm -rf ./build ./dist"
+unsure 0.67
 
-$ jevx is "Does this line contain a password?" --in "DATABASE_URL=postgres://app:Pr0d-p4ss@db.internal:5432/app"
-yes 0.99
+$ jevx is "Does this command delete files outside the current project folder?" --in "rm -rf ./build ./dist"
+no 0.05
 ```
 
-A broad "real credential" makes the model hedge (is it a real one?); "a password" is a plain fact about the text.
+"Dangerous" depends on what you care about; "outside the project folder" is a plain fact about the command.
 
 ### Say what counts as yes
 
 ```console
-$ printf "A: Jon Smith, 12 Baker St, London, jon@acme.io\nB: John Smith, 12 Baker Street, London NW1, j.smith@acme.io" | jevx is "Are A and B the same customer?"
-unsure 0.75
+$ printf "A: Acme Ltd, London\nB: ACME Holdings Group plc, London" | jevx is "Are A and B the same company?"
+unsure 0.33
 
-$ printf "A: ...\nB: ..." | jevx is "Are A and B the same person? Small spelling differences and a different email on the same company domain still count as the same person."
-yes 0.86
+$ printf "A: Acme Ltd, London\nB: ACME Holdings Group plc, London" | jevx is "Are A and B the same company? Only an exact legal name match counts; a parent group or a different suffix is a different company."
+no 0.02
 ```
 
 The model sees only the question and the input. Your matching rule has to be in the question.
@@ -280,7 +281,7 @@ The model sees only the question and the input. Your matching rule has to be in 
 
 ```console
 $ jevx is "Does the invoice say payment is due in October 2026?" < invoice.txt
-unsure 0.24
+unsure 0.31
 
 $ jevx pick "Which date is the payment due date?" a=2026-09-01 b=2026-10-16 c=2026-10-31 --in @invoice.txt
 b 1.00
@@ -292,7 +293,10 @@ The invoice says "45 days after 2026-09-01"; the model judges text, it does not 
 
 ```console
 $ jevx filter "Does this review comment ask for a code change or point out a real problem?" < reviews.txt
-(kept "nit: rename x to count" with the real problems)
+nit: rename x to count
+This loop never terminates when the list is empty
+Could we reuse the retry helper here instead of a new one?
+This builds the SQL with string concatenation from user input: SQL injection
 
 $ jevx ask --lines reviews.txt --choice kind="...|must=...;should=...;nit=...;none=..."
 nit / must / none / should / none / must

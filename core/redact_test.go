@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -62,6 +64,9 @@ func TestHostedCallIsScrubbedAndLedgered(t *testing.T) {
 	ForceHosted, LedgerOn = true, true
 	defer func() { ForceHosted = false }()
 	ActiveProfile = "jev"
+	var notice bytes.Buffer
+	RedactNotice, redactNotice = &notice, sync.Once{}
+	defer func() { RedactNotice = os.Stderr }()
 
 	var sent []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +84,11 @@ func TestHostedCallIsScrubbedAndLedgered(t *testing.T) {
 		if strings.Contains(string(sent), leak) {
 			t.Fatalf("request body leaked %q: %s", leak, sent)
 		}
+	}
+
+	// the caller is told, without the values, so "does this contain a secret?" is not silently unsure
+	if n := notice.String(); !strings.Contains(n, "redacted 3 item(s)") || strings.Contains(n, "s3cr3t") || strings.Contains(n, "example.org") {
+		t.Fatalf("redaction notice: %q", n)
 	}
 
 	b, err := os.ReadFile(filepath.Join(home, ".local/share/jevx/calls.jsonl"))

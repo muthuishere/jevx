@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -656,6 +657,33 @@ var (
 	LedgerOn = true
 )
 
+// RedactNotice receives one line, once per process, when a hosted call had something redacted: otherwise a question like
+// "does this contain a password?" silently comes back unsure, because the model never saw the password.
+var RedactNotice io.Writer = os.Stderr
+
+var redactNotice sync.Once
+
+// NoteRedacted tells the caller, once per process, that n items were redacted before a hosted call. Values are never
+// printed.
+func NoteRedacted(n int) {
+	if n > 0 {
+		redactNotice.Do(func() {
+			fmt.Fprintf(RedactNotice, "jevx: redacted %d item(s) (a secret, email or phone number) before this call to a hosted endpoint, so the model judged the text without them. The redaction itself means one was there; to judge the raw text, use a local endpoint.\n", n)
+		})
+	}
+}
+
+// Redactions counts what a call to p would redact (0 for a local endpoint). A cached answer to a hosted call came
+// from redacted text too, so its caller is told the same way.
+func Redactions(p Profile, state string, qs map[string]any) int {
+	if !Hosted(p.Expanded()) {
+		return 0
+	}
+	_, n1 := Scrub(state)
+	_, n2 := redactQuestions(qs)
+	return n1 + n2
+}
+
 // AskRaw is Ask without the shared LastRaw: it returns the response body too, so concurrent callers stay race-free.
 // It retries 429 / 5xx / network errors with backoff, rejects a reply that does not answer exactly the questions asked
 // or carries out-of-range probabilities (fail closed), and appends one line per call to the ledger.
@@ -672,6 +700,7 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 		sendState, n1 = Scrub(state)
 		sendQs, n2 = redactQuestions(qs)
 		redacted = n1 + n2
+		NoteRedacted(redacted)
 	}
 	body, _ := json.Marshal(map[string]any{"model": p.Model, "state": sendState, "questions": sendQs})
 	t0 := time.Now()

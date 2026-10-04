@@ -211,6 +211,13 @@ jevx profile add local http://127.0.0.1:21131/v1/systemone --model myjev   # onl
 If a call exits 4 asking for `TYPESAFE_API_KEY` (or another variable), tell the user which variable to set. Do not
 guess one, and never ask them to paste a key into the chat.
 
+## Redaction on hosted endpoints
+
+Before a call to a hosted endpoint, jevx removes secrets, emails and phone numbers from the input and the question.
+When it does, it prints `jevx: redacted N item(s) ...` on stderr (never the values). Read that line as an answer: the
+text holds a secret, email or phone number, even if the verdict says `unsure`. To have the model judge the raw text, use
+a local endpoint (`--profile local`).
+
 ## Never
 - Use it as a safety gate. Permissions, money, legal and irreversible calls stay with the user.
 - Put secrets into `--in` or `--proposal`.
