@@ -1,0 +1,58 @@
+# Install smoke: after every release, install the PUBLISHED release the way users do (install.sh, install.cmd, npm) on
+# Linux, macOS and Windows, then check the version, the agent skill, and a real call that comes back as a verdict.
+# The call goes to scripts/smoke_stub.py, a local contract stub (no key, no model): this proves install and wiring,
+# not the hosted model's answers.
+name: install smoke
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: release tag to install, e.g. v0.12.2
+        required: true
+permissions:
+  contents: read
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        channel: [script, npm]
+    runs-on: ${{ matrix.os }}
+    env:
+      VER: ${{ inputs.version || github.event.workflow_run.head_branch }}
+      JEVX_NO_HOOK: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v4
+        if: matrix.channel == 'npm'
+        with:
+          node-version: 22
+      - name: install.sh
+        if: matrix.channel == 'script' && runner.os != 'Windows'
+        run: |
+          curl -fsSL https://muthuishere.github.io/jevx/install.sh | JEVX_VERSION="$VER" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: install.cmd
+        if: matrix.channel == 'script' && runner.os == 'Windows'
+        shell: cmd
+        run: |
+          curl -fsSLo install.cmd https://muthuishere.github.io/jevx/install.cmd || exit /b 1
+          set JEVX_VERSION=%VER%
+          call install.cmd || exit /b 1
+          echo %LOCALAPPDATA%\Programs\jevx>>%GITHUB_PATH%
+      - name: npm
+        if: matrix.channel == 'npm'
+        shell: bash
+        run: |
+          for i in 1 2 3 4 5 6; do npm view "@muthuishere/jevx@${VER#v}" version >/dev/null 2>&1 && break; sleep 20; done
+          npm i -g "@muthuishere/jevx@${VER#v}"
+      - name: check
+        shell: bash
+        run: scripts/smoke_check.sh "$VER"

@@ -4,7 +4,8 @@
 set -euo pipefail
 want=${1:?usage: smoke_check.sh vX.Y.Z}
 dir=$(cd "$(dirname "$0")" && pwd)
-py=$(command -v python3 || command -v python)
+py=""; for c in python3 python; do "$c" -c "" >/dev/null 2>&1 && { py=$c; break; }; done  # Windows has a python3 stub that does not run
+[ -n "$py" ] || { echo "FAIL: no working python for the stub"; exit 1; }
 "$py" "$dir/smoke_stub.py" 21999 & stub=$!
 trap 'kill $stub 2>/dev/null || true' EXIT
 for _ in $(seq 1 50); do (echo >/dev/tcp/127.0.0.1/21999) 2>/dev/null && break; sleep 0.1; done
