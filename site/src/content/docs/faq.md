@@ -41,6 +41,21 @@ Yes, by default. The same endpoint, model, input and question returns the stored
 </details>
 
 <details class="faq">
+<summary>Every call fails with "profile jev needs YOUR_KEY_VAR in the environment"</summary>
+
+The installer before v0.12.3 ended with a suggested `jevx profile add jev URL --model M --header "Authorization: Bearer $YOUR_KEY_VAR"`. Typed as printed, it replaces the built-in hosted profile with a placeholder, so every later call stops with exit `4`. Remove it and the built-in profile is back:
+
+```console
+$ jevx profile remove jev
+$ echo "Prod is down" | jevx is "Is this urgent?"
+yes 0.92
+```
+
+The v0.12.3 installer prints the real next step instead: set `TYPESAFE_API_KEY`, then ask.
+
+</details>
+
+<details class="faq">
 <summary>What does it cost?</summary>
 
 jevx itself is free and open source. A hosted endpoint charges per call, and a repeated call is answered from the [cache](/jevx/reference/privacy/#the-answer-cache) at no charge; `jevx stats` shows calls and tokens per day. A self-hosted or local model costs whatever it costs you to run.
