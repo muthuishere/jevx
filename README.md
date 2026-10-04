@@ -68,20 +68,29 @@ jevx profile add local http://127.0.0.1:21131/v1/systemone --model myjev     # t
 
 ## Quickstart
 
+Real answers from hosted Jev (2026-10-04); a different model or day can differ in the decimals. The two input files:
+
+```console
+$ printf '%s\n' 'INFO  request served /checkout 200 in 84ms' 'ERROR payment gateway timeout after 30s' \
+    'INFO  cache warmed 1200 keys' 'FATAL db connection refused' > app.log
+$ printf '%s\n' 'Changing your avatar' 'Pricing of the enterprise plan' 'Refund policy for annual plans' \
+    'Keyboard shortcuts' > docs.txt
+```
+
 ```console
 $ echo "Checkout is down, customers are being charged twice" | jevx is "Is this urgent?"
-yes 0.98
+yes 0.97
 
 $ jevx pick "Which team?" web=frontend api=backend billing=money --in "I was charged twice"
-billing 0.97
+billing 1.00
 
 $ jevx filter "Is this an error or failure?" < app.log
 ERROR payment gateway timeout after 30s
 FATAL db connection refused
 
 $ jevx rank "Is this about money?" --top 2 < docs.txt
+0.97  Pricing of the enterprise plan
 0.97  Refund policy for annual plans
-0.86  Pricing of the enterprise plan
 ```
 
 `is`, `pick`, `filter` and `rank` are shortcuts over one command, `jevx ask`, which takes many questions at once, over
@@ -94,10 +103,15 @@ $ jevx question add sev --score "How severe is this?|low;medium;high"
 
 $ echo "Checkout is down, customers are being charged twice" | jevx ask urgent,team,sev
 sev              high       0.99
-team             billing    0.87
-urgent           yes        0.95
+team             billing    0.91
+urgent           yes        0.96
 
-$ jevx ask --lines app.log --noul err="Is this an error?" --parallel 8     # a table, one row per input (--raw: the full JSONL)
+$ jevx ask --lines app.log --noul err="Is this an error?" --parallel 8     # --raw: the full JSONL
+VERDICT  P     INPUT
+no       0.02  INFO  request served /checkout 200 in 84ms
+yes      0.98  ERROR payment gateway timeout after 30s
+no       0.03  INFO  cache warmed 1200 keys
+yes      0.98  FATAL db connection refused
 ```
 
 ## Context: from the files you already keep
