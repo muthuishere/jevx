@@ -2,11 +2,19 @@
 # Linux, macOS and Windows, then check the version, the agent skill, and a real call that comes back as a verdict.
 # The call goes to scripts/smoke_stub.py, a local contract stub (no key, no model): this proves install and wiring,
 # not the hosted model's answers.
+#
+# Triggers: workflow_run fires when the release workflow finishes (npm included). `release: published` would never fire
+# here, because release.yml creates the release with GITHUB_TOKEN and GitHub starts no workflows from that token's
+# events. A push that changes the smoke itself re-runs it against the latest release, so a fix is proven without a
+# manual dispatch (which needs repo admin).
 name: install smoke
 on:
   workflow_run:
     workflows: [release]
     types: [completed]
+  push:
+    branches: [main]
+    paths: [.github/workflows/smoke.yml, scripts/smoke_check.sh, scripts/smoke_stub.py]
   workflow_dispatch:
     inputs:
       version:
@@ -16,7 +24,7 @@ permissions:
   contents: read
 jobs:
   smoke:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -24,12 +32,20 @@ jobs:
         channel: [script, npm]
     runs-on: ${{ matrix.os }}
     env:
-      VER: ${{ inputs.version || github.event.workflow_run.head_branch }}
+      VER: ${{ inputs.version || github.event.workflow_run.head_branch }} # empty on push: the latest release
       JEVX_NO_HOOK: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: scripts
+      - name: version under test
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -n "$VER" ] || VER=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          echo "VER=$VER" >> "$GITHUB_ENV"
+          echo "testing $VER"
       - uses: actions/setup-node@v4
         if: matrix.channel == 'npm'
         with:
