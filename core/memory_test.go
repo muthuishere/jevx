@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -148,7 +149,8 @@ func TestSaveLoadAndNames(t *testing.T) {
 	if err != nil || len(got.Sections) != len(m.Sections) || got.Pins[0] != "notices.md" {
 		t.Fatalf("round trip: %v %+v", err, got)
 	}
-	if st, _ := os.Stat(filepath.Join(MemoryDir(), "t.json")); st.Mode().Perm() != 0o600 {
+	// Windows has no Unix permission bits (Go reports rw-rw-rw-); the per-user profile folder's ACLs keep it private.
+	if st, _ := os.Stat(filepath.Join(MemoryDir(), "t.json")); runtime.GOOS != "windows" && st.Mode().Perm() != 0o600 {
 		t.Fatalf("the index is private: %v", st.Mode())
 	}
 	if _, err := LoadMemory("../x"); err == nil {
