@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -53,5 +54,35 @@ func TestDocsUsageLinesMatchBinary(t *testing.T) {
 			}
 		}
 		fh.Close()
+	}
+}
+
+// TestDocsHelpBlocksMatchBinary: a docs block that starts with "$ jevx CMD -h" must be exactly what the binary prints.
+func TestDocsHelpBlocksMatchBinary(t *testing.T) {
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "jevx")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, out)
+	}
+	block := regexp.MustCompile("(?s)\\$ jevx (\\w+) -h\\r?\\n(.*?)\\r?\\n```")
+	files, _ := filepath.Glob("../../site/src/content/docs/*/*.md*")
+	n := 0
+	for _, f := range files {
+		b, _ := os.ReadFile(f)
+		for _, m := range block.FindAllStringSubmatch(string(b), -1) {
+			n++
+			out, _ := exec.Command(bin, m[1], "-h").CombinedOutput()
+			got := strings.TrimRight(strings.ReplaceAll(string(out), "\r\n", "\n"), "\n")
+			want := strings.ReplaceAll(m[2], "\r\n", "\n")
+			if got != want {
+				t.Errorf("%s: the `jevx %s -h` block differs from the binary; paste its current output", f, m[1])
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("found no -h blocks in the docs: the pattern is broken")
 	}
 }
