@@ -52,12 +52,27 @@ if command -v sec >/dev/null; then
 fi
 [ -n "${DRY_RUN:-}" ] && { say "dry run: would tag $next on $(git rev-parse --short HEAD)"; exit 0; }
 
+say "changelog entry and release commit for $next"
+# The tag must sit on a commit that GitHub Pages has never deployed: Pages keys a deployment on the commit, so a tag on
+# an already-deployed commit "succeeds" but keeps serving the old build (and the old header version). A release commit
+# that adds the changelog entry is always new.
+log=site/src/content/docs/reference/changelog.md
+entry=$(mktemp)
+{ printf '## %s (%s)\n\n' "$next" "$(date +%Y-%m-%d)"
+  git log --no-merges --format='- %s' "$last"..HEAD | grep -v -e '^- Release v' -e '^- sync(box)' || true
+  printf '\n'; } > "$entry"
+awk -v f="$entry" 'BEGIN{done=0} /^## /&&!done{while((getline l<f)>0)print l; done=1} {print} END{if(!done)while((getline l<f)>0)print l}' "$log" > "$log.new"
+mv "$log.new" "$log"; rm -f "$entry"
+${EDITOR_RELEASE:-true} "$log" # set EDITOR_RELEASE=vi to edit the generated entry before it is committed
+git add "$log"
+git commit -q -m "Release $next"
+
 say "tag and push $next"
 git tag -a "$next" -m "jevx $next"
 git push -q "$REMOTE" main "$next"
 
 say "waiting for CI"
-sha=$(git rev-parse HEAD)
+sha=$(git rev-parse HEAD) # the release commit
 for wf in release "Deploy Pages"; do
   id=""
   for _ in $(seq 1 30); do

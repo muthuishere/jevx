@@ -90,6 +90,7 @@ export default defineConfig({
 						{ label: 'CLI reference', slug: 'reference/cli' },
 						{ label: 'Config file', slug: 'reference/config' },
 						{ label: 'Compared with other Jev tools', slug: 'reference/comparison' },
+						{ label: 'Changelog', slug: 'reference/changelog' },
 					],
 				},
 				{ label: 'FAQ', slug: 'faq' },

@@ -74,7 +74,15 @@ jobs:
         shell: bash
         run: |
           for i in 1 2 3 4 5 6; do npm view "@muthuishere/jevx@${VER#v}" version >/dev/null 2>&1 && break; sleep 20; done
-          npm i -g "@muthuishere/jevx@${VER#v}"
+          # right after a publish the registry can list a version before every mirror serves it: retry, and put npm's
+          # own error on the run page if it still fails
+          for i in 1 2 3 4 5; do
+            npm i -g "@muthuishere/jevx@${VER#v}" > npm.out 2>&1 && { tail -3 npm.out; exit 0; }
+            echo "npm install attempt $i failed; retrying in 30 s"; sleep 30
+          done
+          cat npm.out
+          grep -v '^npm notice' npm.out | tail -6 | while IFS= read -r l; do echo "::error title=npm install ($RUNNER_OS)::$l"; done
+          exit 1
       - name: check
         shell: bash
         run: scripts/smoke_check.sh "$VER"
