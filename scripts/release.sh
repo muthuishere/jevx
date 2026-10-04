@@ -57,6 +57,10 @@ say "changelog entry and release commit for $next"
 # an already-deployed commit "succeeds" but keeps serving the old build (and the old header version). A release commit
 # that adds the changelog entry is always new.
 log=site/src/content/docs/reference/changelog.md
+if grep -q "^## $next " "$log"; then
+  # a hand-written entry for this version is already there: keep it; the empty commit still gives the tag a new commit
+  git commit -q --allow-empty -m "Release $next"
+else
 entry=$(mktemp)
 { printf '## %s (%s)\n\n' "$next" "$(date +%Y-%m-%d)"
   git log --no-merges --format='- %s' "$last"..HEAD | grep -v -e '^- Release v' -e '^- sync(box)' || true
@@ -66,6 +70,7 @@ mv "$log.new" "$log"; rm -f "$entry"
 ${EDITOR_RELEASE:-true} "$log" # set EDITOR_RELEASE=vi to edit the generated entry before it is committed
 git add "$log"
 git commit -q -m "Release $next"
+fi
 
 say "tag and push $next"
 git tag -a "$next" -m "jevx $next"

@@ -3,6 +3,11 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.5 (2026-10-05)
+
+- `jevx plugin test` builds its sample for the tool the plugin watches. A plugin on `Write`, `Edit` or `WebFetch` (the `secret-guard` example, the shipped `injection-screen`) printed "would not run" and could not be tested.
+- The agent skill quotes the largest memory measurement (143 held-out claims: AUC 0.48 to 0.76; `--memory-strict` misses 3% of changed numbers and wrongly rejects 35% of true claims, so a strict "no" flags for a person and never decides alone). Earlier releases quoted a smaller run (AUC 0.86).
+
 ## v0.12.4 (2026-10-04)
 
 - Hosted-call redaction is no longer silent: when jevx removes a secret, email or phone number before a call to a hosted endpoint, it prints one line on stderr (`jevx: redacted N item(s) ...`, count only, never the values), also for cached answers. A "does this contain a password?" no longer comes back as an unexplained `unsure`.
