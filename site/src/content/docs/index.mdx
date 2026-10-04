@@ -44,7 +44,7 @@ yes 0.96
 		It reads the `## Jev` section of the AGENTS.md / CLAUDE.md you already keep. Nothing new to maintain.
 	</Card>
 	<Card title="Judge against your own notes" icon="document">
-		`--memory` sends the best-matching sections of your docs after the item: a 0.4B local model went from AUC 0.30 to 0.86 on 68 held-out claims. `--memory-strict` catches changed numbers (40 of 40).
+		`--memory` sends the best-matching sections of your docs after the item: on 143 held-out claims a 0.4B local model went from AUC 0.48 to 0.76. `--memory-strict` catches 70 of 72 changed numbers, at a cost in wrongly failed true claims.
 	</Card>
 	<Card title="Repeat calls are free" icon="rocket">
 		Answers are kept on your machine, keyed by a hash, so asking the same thing again returns in milliseconds and costs nothing. On by default; `--fresh` asks again.

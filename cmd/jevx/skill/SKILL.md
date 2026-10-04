@@ -62,9 +62,10 @@ jevx memory list                                      # what exists; never creat
 jevx memory show docs "does v2 drop the 512-token limit?"   # what would be retrieved, with page#heading and lines
 jevx ask --memory docs --memory-strict --lines claims.txt --noul true="Is this claim correct per the notes?"
 ```
-- Measured: notes took a 0.4B local model from AUC 0.30 to 0.86 on 68 held-out claims. The weak spot is a changed
-  number (29 of 40 caught); `--memory-strict` fails a yes/no claim whose number, `code` or name is missing from the
-  notes: 40 of 40 caught, accuracy 75% to 86%, at the cost of 11 instead of 9 of 40 true claims wrongly failed.
+- Measured on 143 held-out claims (the largest run): notes took a 0.4B local model from AUC 0.48 to 0.76. The weak
+  spot is a changed number (50 of 72 caught); `--memory-strict` fails a yes/no claim whose number, `code` or name is
+  missing from the notes: 70 of 72 caught, accuracy 81%, but about a third of true claims (25 of 71) wrongly failed.
+  Treat a strict "no" as "check this", not as proof.
 - It adds facts, not reasoning. The strict rule checks presence, not negation ("not MIT" contains MIT).
 - `jevx memory check NAME` marks pages whose cited lines changed as stale; run it (and `index`) after docs change.
 

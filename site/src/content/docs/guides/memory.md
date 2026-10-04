@@ -1,6 +1,6 @@
 ---
 title: Memory
-description: Judge an item against your own notes. jevx retrieves the best-matching sections of a folder of markdown (BM25, no embeddings) and sends them after the item. Measured numbers, the weak spot, and the strict rule that covers it.
+description: Judge an item against your own notes. jevx retrieves the best-matching sections of a folder of markdown (BM25, no embeddings) and sends them after the item. Measured numbers (largest run first), the weak spot, and the strict rule that covers it.
 ---
 
 `jevx memory` points a question at a folder of distilled, cited markdown: a wiki, runbooks, release notes. For each item it retrieves the best-matching sections and sends them **after** the item, so a server that keeps only its first N tokens can trim notes but never the item. Retrieval is BM25 over heading sections: no embeddings, no vector database, and nothing leaves your machine to build the index.
@@ -39,26 +39,30 @@ Every cite in a page (`app:path:L10-L20`) is hashed when the page is indexed. `j
 
 ## How well it works
 
-Measured on held-out claims, with the configuration frozen before the test (k 3, budget 2000, item first):
+Measured on held-out claims, with the configuration frozen before each test (k 3, budget 2000, item first). The largest run comes first; it is the most reliable, and its effect is smaller than the earlier, smaller runs showed.
 
-| setup | without notes | with notes |
-| --- | --- | --- |
-| local 0.4B model, n=68 claims (34 true, 34 with one changed number or word) | AUC 0.30, accuracy 47% | **AUC 0.86**, accuracy 71% (McNemar p=0.023) |
-| hosted model, n=48 | AUC 0.62, accuracy 42% | AUC 0.83, accuracy 81% (p=0.0005) |
+**Largest run: 143 fresh claims** (71 true page sentences, 72 with one number changed), local 0.4B model:
 
-**The weak spot is a changed number.** A note that matches except for one figure pulls the answer toward "true": with notes alone, the local model caught 29 of 40 claims that had one number changed.
+| condition | AUC | accuracy | changed numbers caught | true claims wrongly failed |
+| --- | --- | --- | --- | --- |
+| no notes | 0.48 | 49% | 66 / 72 | 67 / 71 (it calls almost everything false) |
+| notes | **0.76** | 69% | 50 / 72 | 22 / 71 |
+| notes + `--memory-strict` | n/a | **81%** | **70 / 72** | 25 / 71 |
 
-**`--memory-strict` covers it.** It compares the numbers, `` `code` `` and names in the item with those in the retrieved notes, and fails a yes/no claim when one is missing. On 80 unseen rows (40 page sentences, 40 number mutants):
+Notes help (McNemar p=0.0004), and `--memory-strict` helps on top of them (p=0.0005). The cost is real: with the strict rule, about a third of true claims (25 of 71) are wrongly failed. Use it when a wrong "true" is worse than a wrong "false".
 
-| | changed numbers caught | accuracy | true claims wrongly failed |
+**The weak spot is a changed number.** A note that matches except for one figure pulls the answer toward "true": with notes alone, 50 of 72 changed numbers were caught. `--memory-strict` compares the numbers, `` `code` `` and names in the item with those in the retrieved notes and fails a yes/no claim when one is missing. On its own, the rule flags a true claim wrongly only when the right section was not among the retrieved ones; a wider retrieval window was tested and did not help, so the defaults stay.
+
+**Earlier, smaller runs** (same method, kept for the record):
+
+| run | without notes | with notes | `--memory-strict` |
 | --- | --- | --- | --- |
-| notes alone | 29 / 40 | 75% | 9 / 40 |
-| notes + `--memory-strict` | **40 / 40** | **86%** (p=0.022) | 11 / 40 |
-
-The rule costs two more true claims wrongly failed. Use it when a wrong "true" is worse than a wrong "false".
+| local model, n=68 claims | AUC 0.30, accuracy 47% | AUC 0.86, accuracy 71% (p=0.023) | |
+| hosted model, n=48 | AUC 0.62, accuracy 42% | AUC 0.83, accuracy 81% (p=0.0005) | |
+| local model, n=80 rows | | accuracy 75%, 29 / 40 changed numbers caught, 9 / 40 true failed | accuracy 86%, 40 / 40 caught, 11 / 40 true failed (p=0.022) |
 
 ## Limits
 
 - **It adds missing facts, not missing reasoning.** On a judgement task (not a fact check), notes did not help the small local model.
 - **The strict rule checks presence, not negation.** Notes that say "not MIT" contain "MIT".
-- **Samples are small** (n = 48 to 80). These are the measured numbers for these sets; run your own claims before trusting a threshold.
+- **Samples are small** (n = 48 to 143). These are the measured numbers for these sets; run your own claims before trusting a threshold.

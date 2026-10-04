@@ -141,12 +141,12 @@ jevx memory show docs "does v2 drop the 512-token limit?"           # what would
 jevx ask --memory docs --memory-k 3 --memory-budget 2000 --lines claims.txt --noul "true=Is this claim correct per the notes?"
 ```
 
-**Honest caveat.** On 68 held-out claims (34 true, 34 with one changed number or word), notes lifted a small local model from
-AUC 0.30 to 0.86 and hosted Jev from 0.62 to 0.83 (both significant). It is **weakest at spotting a changed number**: a note
-that matches except for one figure pulls the answer toward "true". Pair it with a number/entity diff rule (compare the figures
-in the item with those in the retrieved note) before trusting a "true". That rule ships as `--memory-strict`: on 80 unseen
-rows it caught 40 of 40 changed numbers (29 without it), accuracy 75% to 86%, at the cost of 11 instead of 9 of 40 true
-claims wrongly failed.
+**Honest caveat.** On the largest held-out run (143 fresh claims: 71 true, 72 with one changed number), notes lifted a small local
+model from AUC 0.48 to 0.76 (p=0.0004). Earlier, smaller runs looked better (0.30 to 0.86 at n=68), so quote the large one.
+It is **weakest at spotting a changed number**: a note that matches except for one figure pulls the answer toward "true".
+`--memory-strict` compares the figures, code and names in the item with those in the retrieved notes: on the same 143 claims it
+caught 70 of 72 changed numbers and lifted accuracy to 81%, but it wrongly failed about a third of true claims (25 of 71).
+
 Docs: [Memory](https://muthuishere.github.io/jevx/guides/memory/).
 
 ## Plugins: judgements at agent events
