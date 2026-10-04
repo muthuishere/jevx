@@ -5,7 +5,7 @@ description: Every jevx command and subcommand on one page, with the usage lines
 
 ```console
 $ jevx help
-usage: jevx ask|is|pick|filter|rank|question|context|defaults|judge|plugin|hook|profile|stats|install|uninstall|skill|version
+usage: jevx ask|is|pick|filter|rank|question|memory|context|defaults|cache|judge|plugin|hook|profile|stats|install|uninstall|skill|version
   jevx COMMAND -h for flags; jevx skill for the full guide; https://muthuishere.github.io/jevx/
 ```
 
