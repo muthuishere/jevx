@@ -14,7 +14,7 @@ on:
     types: [completed]
   push:
     branches: [main]
-    paths: [.github/workflows/smoke.yml, scripts/smoke_check.sh, scripts/smoke_stub.py]
+    paths: [.github/workflows/smoke.yml, scripts/smoke_check.sh, scripts/smoke_stub.py, install.sh, install.cmd]
   workflow_dispatch:
     inputs:
       version:
@@ -37,7 +37,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts
+          sparse-checkout: |
+            scripts
+            install.sh
+            install.cmd
+          sparse-checkout-cone-mode: false
       - name: version under test
         shell: bash
         env:
@@ -53,13 +57,15 @@ jobs:
       - name: install.sh
         if: matrix.channel == 'script' && runner.os != 'Windows'
         run: |
-          curl -fsSL https://muthuishere.github.io/jevx/install.sh | JEVX_VERSION="$VER" sh
+          # on a push the installer under test is the pushed one (the site may not be redeployed yet)
+          if [ "$GITHUB_EVENT_NAME" = push ]; then JEVX_VERSION="$VER" sh install.sh
+          else curl -fsSL https://muthuishere.github.io/jevx/install.sh | JEVX_VERSION="$VER" sh; fi
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: install.cmd
         if: matrix.channel == 'script' && runner.os == 'Windows'
         shell: cmd
         run: |
-          curl -fsSLo install.cmd https://muthuishere.github.io/jevx/install.cmd || exit /b 1
+          if not "%GITHUB_EVENT_NAME%"=="push" (curl -fsSLo install.cmd https://muthuishere.github.io/jevx/install.cmd || exit /b 1)
           set JEVX_VERSION=%VER%
           call install.cmd || exit /b 1
           echo %LOCALAPPDATA%\Programs\jevx>>%GITHUB_PATH%
