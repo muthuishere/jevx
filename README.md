@@ -145,7 +145,8 @@ jevx ask --memory docs --memory-k 3 --memory-budget 2000 --lines claims.txt --no
 model from AUC 0.48 to 0.76 (p=0.0004). Earlier, smaller runs looked better (0.30 to 0.86 at n=68), so quote the large one.
 It is **weakest at spotting a changed number**: a note that matches except for one figure pulls the answer toward "true".
 `--memory-strict` compares the figures, code and names in the item with those in the retrieved notes: on the same 143 claims it
-caught 70 of 72 changed numbers and lifted accuracy to 81%, but it wrongly failed about a third of true claims (25 of 71).
+missed 2 of 72 changed numbers (3%) and lifted accuracy to 81%, but it wrongly rejected 25 of 71 true claims (35%): it flags a
+claim for a person, it never decides alone.
 
 Docs: [Memory](https://muthuishere.github.io/jevx/guides/memory/).
 

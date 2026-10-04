@@ -64,8 +64,8 @@ jevx ask --memory docs --memory-strict --lines claims.txt --noul true="Is this c
 ```
 - Measured on 143 held-out claims (the largest run): notes took a 0.4B local model from AUC 0.48 to 0.76. The weak
   spot is a changed number (50 of 72 caught); `--memory-strict` fails a yes/no claim whose number, `code` or name is
-  missing from the notes: 70 of 72 caught, accuracy 81%, but about a third of true claims (25 of 71) wrongly failed.
-  Treat a strict "no" as "check this", not as proof.
+  missing from the notes: it misses 2 of 72 changed numbers (3%) but wrongly rejects 25 of 71 true claims (35%).
+  A strict "no" flags the claim for a person (say so in your report); it never decides alone.
 - It adds facts, not reasoning. The strict rule checks presence, not negation ("not MIT" contains MIT).
 - `jevx memory check NAME` marks pages whose cited lines changed as stale; run it (and `index`) after docs change.
 

@@ -49,7 +49,7 @@ Measured on held-out claims, with the configuration frozen before each test (k 3
 | notes | **0.76** | 69% | 50 / 72 | 22 / 71 |
 | notes + `--memory-strict` | n/a | **81%** | **70 / 72** | 25 / 71 |
 
-Notes help (McNemar p=0.0004), and `--memory-strict` helps on top of them (p=0.0005). The cost is real: with the strict rule, about a third of true claims (25 of 71) are wrongly failed. Use it when a wrong "true" is worse than a wrong "false".
+Notes help (McNemar p=0.0004), and `--memory-strict` helps on top of them (p=0.0005). Its two error rates on this run: it **misses 2 of 72 changed numbers (3%)** and **wrongly rejects 25 of 71 true claims (35%)**. So a strict "no" flags the claim for a person to check; it never decides alone.
 
 **The weak spot is a changed number.** A note that matches except for one figure pulls the answer toward "true": with notes alone, 50 of 72 changed numbers were caught. `--memory-strict` compares the numbers, `` `code` `` and names in the item with those in the retrieved notes and fails a yes/no claim when one is missing. On its own, the rule flags a true claim wrongly only when the right section was not among the retrieved ones; a wider retrieval window was tested and did not help, so the defaults stay.
 
