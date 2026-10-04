@@ -107,9 +107,11 @@ jevx plugin enable all --act         # every plugin at once (also: disable all)
 jevx question add secret --noul "Does this file content contain a credential, token or private key?"
 jevx plugin add secret-guard --desc "Refuse writing a secret into a file" \
   --on "PreToolUse:Write|Edit" --ask secret --deny "secret >= 0.8" --local
-jevx plugin test secret-guard "AWS_SECRET_ACCESS_KEY=..."
+jevx plugin test secret-guard "aws_access_key_id = AKIAIOSFODNN7EXAMPLE"
 jevx install --hooks && jevx plugin enable secret-guard
 ```
+
+`test` builds its sample for the tool the plugin watches (here a `Write` with that content). Against hosted Jev (2026-10-04) it denies AWS's documentation example key (`secret` 0.95) and a `password: ...` line (0.96), and allows `LOG_LEVEL=debug` (0.03). Plugins redact secrets before a hosted call, so the model sees `[SECRET]` in place of the value; that marker is enough for it to answer yes.
 
 ```console
 $ jevx plugin add

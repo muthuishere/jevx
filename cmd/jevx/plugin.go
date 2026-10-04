@@ -186,7 +186,7 @@ func cmdPlugin(args []string) {
 		case *payload != "":
 			_ = json.Unmarshal([]byte(text("@"+*payload)), &pay)
 		default:
-			pay = samplePayload(p.Event(), fs.Args())
+			pay = samplePayload(p.Event(), p.Tool(), fs.Args())
 		}
 		if pay == nil {
 			die("payload is not JSON")
@@ -249,18 +249,40 @@ func builtinQuestions(p core.Profile) []string {
 }
 
 // samplePayload is a stand-in event for `plugin test` when no payload is given; extra words become the command / prompt.
-func samplePayload(event string, words []string) core.Payload {
+func samplePayload(event, tools string, words []string) core.Payload {
 	wd, _ := os.Getwd()
 	txt := strings.Join(words, " ")
 	p := core.Payload{"session_id": "test", "cwd": wd, "hook_event_name": event}
 	switch event {
 	case "PreToolUse", "PostToolUse":
-		if txt == "" {
-			txt = "rm -rf ./build && git push --force origin main"
+		// the sample is for the plugin's own tool (the first in its matcher): a Write|Edit guard gets file content, not a
+		// shell command it would never see
+		tool, _, _ := strings.Cut(strings.Trim(tools, "^$()"), "|")
+		if tool == "" || strings.ContainsAny(tool, ".*+?[\\") {
+			tool = "Bash"
 		}
-		p["tool_name"], p["tool_input"] = "Bash", map[string]any{"command": txt}
+		var in, out map[string]any
+		switch tool {
+		case "Bash":
+			if txt == "" {
+				txt = "rm -rf ./build && git push --force origin main"
+			}
+			in, out = map[string]any{"command": txt}, map[string]any{"stdout": "ok"}
+		case "Write":
+			in = map[string]any{"file_path": filepath.Join(wd, "example.txt"), "content": txt}
+		case "Edit", "MultiEdit":
+			in = map[string]any{"file_path": filepath.Join(wd, "example.txt"), "old_string": "", "new_string": txt}
+		case "WebFetch", "WebSearch":
+			in, out = map[string]any{"url": "https://example.com/docs", "prompt": "summarise"}, map[string]any{"result": txt}
+		default:
+			in = map[string]any{"input": txt}
+		}
+		p["tool_name"], p["tool_input"] = tool, in
 		if event == "PostToolUse" {
-			p["tool_response"] = map[string]any{"stdout": "ok"}
+			if out == nil {
+				out = map[string]any{"result": "ok"}
+			}
+			p["tool_response"] = out
 		}
 	case "UserPromptSubmit":
 		if txt == "" {
