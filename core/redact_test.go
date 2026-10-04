@@ -87,7 +87,7 @@ func TestHostedCallIsScrubbedAndLedgered(t *testing.T) {
 	}
 
 	// the caller is told, without the values, so "does this contain a secret?" is not silently unsure
-	if n := notice.String(); !strings.Contains(n, "redacted 3 item(s)") || strings.Contains(n, "s3cr3t") || strings.Contains(n, "example.org") {
+	if n := notice.String(); !strings.Contains(n, "redacted 1 email-shaped (user@host), 1 phone number, 1 secret before") || strings.Contains(n, "s3cr3t") || strings.Contains(n, "example.org") {
 		t.Fatalf("redaction notice: %q", n)
 	}
 
@@ -126,5 +126,25 @@ func TestLocalCallIsNotScrubbed(t *testing.T) {
 	}
 	if !strings.Contains(string(sent), "a.b@example.org") {
 		t.Fatalf("local call was scrubbed: %s", sent)
+	}
+}
+
+// The notice names what was redacted, by category, so a reader can tell a password from a user@host that only looks
+// like an email (the email rule also matches user@host in a connection URL).
+func TestRedactionNamesTheCategory(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"DATABASE_URL=postgres://app@db.internal:5432/app", "1 email-shaped (user@host)"},
+		{"DATABASE_URL=postgres://app:Pr0d-p4ss@db.internal:5432/app", "1 password (in a URL)"},
+		{"key AKIAIOSFODNN7EXAMPLE and mail ops@example.org", "1 AWS key, 1 email-shaped (user@host)"},
+		{"LOG_LEVEL=debug", ""},
+	} {
+		out, _ := Scrub(c.in)
+		if got := RedactionSummary(RedactedKinds(c.in, out)); got != c.want {
+			t.Errorf("%q: summary %q, want %q", c.in, got, c.want)
+		}
+	}
+	// a marker already in the text is not counted again
+	if k := RedactedKinds("[REDACTED:email] x", "[REDACTED:email] x"); len(k) != 0 {
+		t.Errorf("pre-existing marker counted: %v", k)
 	}
 }

@@ -22,7 +22,7 @@ When the profile's endpoint is **hosted** (anything that is not loopback, a priv
 - well-known token formats (API keys, GitHub, Slack, AWS and Google keys, JWTs), private-key blocks and `user:pass@` URLs
 - email addresses and phone numbers
 
-Each becomes a `[REDACTED:kind]` marker. A local endpoint gets the text unchanged. The ledger records how many items were redacted, never what. Redaction is pattern-based, so the skill still tells agents never to put secrets into `--in` or `--proposal`.
+Each becomes a `[REDACTED:kind]` marker, and jevx prints one stderr line naming what it removed by category (`jevx: redacted 1 password (in a URL), 1 email-shaped (user@host) ...`), never the values. The email rule also matches the `user@host` part of a connection URL, which is why that category says email-shaped. A local endpoint gets the text unchanged. The ledger records how many items were redacted, never what. Redaction is pattern-based, so the skill still tells agents never to put secrets into `--in` or `--proposal`.
 :::
 
 ## Keys

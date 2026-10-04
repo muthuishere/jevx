@@ -3,6 +3,10 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.6 (2026-10-05)
+
+- The redaction notice names what it removed, by category, never the values: `jevx: redacted 1 password (in a URL), 1 email-shaped (user@host) ...`. Before, it said only "N item(s)". The `user@host` part of a connection URL such as `postgres://app@db.internal` matches the email rule, so the notice calls it email-shaped instead of hiding why the hostname was removed.
+
 ## v0.12.5 (2026-10-05)
 
 - `jevx plugin test` builds its sample for the tool the plugin watches. A plugin on `Write`, `Edit` or `WebFetch` (the `secret-guard` example, the shipped `injection-screen`) printed "would not run" and could not be tested.

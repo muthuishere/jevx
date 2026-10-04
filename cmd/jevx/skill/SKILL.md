@@ -215,8 +215,9 @@ guess one, and never ask them to paste a key into the chat.
 ## Redaction on hosted endpoints
 
 Before a call to a hosted endpoint, jevx removes secrets, emails and phone numbers from the input and the question.
-When it does, it prints `jevx: redacted N item(s) ...` on stderr (never the values). Read that line as an answer: the
-text holds a secret, email or phone number, even if the verdict says `unsure`. To have the model judge the raw text, use
+When it does, it prints one stderr line naming what it removed, by category and never the values, e.g. `jevx: redacted
+1 password (in a URL) ...`. Read that line as an answer: the text holds that item, even if the verdict says `unsure`.
+`email-shaped (user@host)` can also be the user and host of a connection URL, not only an email address. To have the model judge the raw text, use
 a local endpoint (`--profile local`).
 
 ## Never

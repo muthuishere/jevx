@@ -663,25 +663,82 @@ var RedactNotice io.Writer = os.Stderr
 
 var redactNotice sync.Once
 
-// NoteRedacted tells the caller, once per process, that n items were redacted before a hosted call. Values are never
-// printed.
-func NoteRedacted(n int) {
-	if n > 0 {
+// NoteRedacted tells the caller, once per process, what was redacted before a hosted call: counts per category, never
+// the values. kinds comes from RedactedKinds.
+func NoteRedacted(kinds map[string]int) {
+	if len(kinds) > 0 {
 		redactNotice.Do(func() {
-			fmt.Fprintf(RedactNotice, "jevx: redacted %d item(s) (a secret, email or phone number) before this call to a hosted endpoint, so the model judged the text without them. The redaction itself means one was there; to judge the raw text, use a local endpoint.\n", n)
+			fmt.Fprintf(RedactNotice, "jevx: redacted %s before this call to a hosted endpoint, so the model judged the text without them. Each was present in the text; to judge the raw text, use a local endpoint.\n", RedactionSummary(kinds))
 		})
 	}
 }
 
-// Redactions counts what a call to p would redact (0 for a local endpoint). A cached answer to a hosted call came
-// from redacted text too, so its caller is told the same way.
-func Redactions(p Profile, state string, qs map[string]any) int {
-	if !Hosted(p.Expanded()) {
-		return 0
+// redactLabels names each Scrub marker for people. user@host in a connection URL matches the email rule, so the
+// label says "email-shaped" rather than claiming it was an email address.
+var redactLabels = map[string]string{
+	"credentials": "password (in a URL)", "secret": "secret", "email": "email-shaped (user@host)", "phone": "phone number",
+	"private-key": "private key", "api-key": "API key", "github-token": "GitHub token", "slack-token": "Slack token",
+	"aws-key": "AWS key", "google-key": "Google key", "jwt": "JWT",
+}
+
+var redactMarker = regexp.MustCompile(`\[REDACTED:([a-z-]+)\]`)
+
+// RedactedKinds counts the redaction markers Scrub added to after that were not already in before, per category.
+func RedactedKinds(before, after string) map[string]int {
+	had := map[string]int{}
+	for _, m := range redactMarker.FindAllStringSubmatch(before, -1) {
+		had[m[1]]++
 	}
-	_, n1 := Scrub(state)
-	_, n2 := redactQuestions(qs)
-	return n1 + n2
+	kinds := map[string]int{}
+	for _, m := range redactMarker.FindAllStringSubmatch(after, -1) {
+		if had[m[1]] > 0 {
+			had[m[1]]--
+			continue
+		}
+		kinds[m[1]]++
+	}
+	return kinds
+}
+
+// RedactionSummary is "1 password (in a URL), 1 email-shaped (user@host)": categories in a stable order.
+func RedactionSummary(kinds map[string]int) string {
+	names := make([]string, 0, len(kinds))
+	for k := range kinds {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, k := range names {
+		label := redactLabels[k]
+		if label == "" {
+			label = k
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", kinds[k], label))
+	}
+	return strings.Join(parts, ", ")
+}
+
+// redactKinds scrubs the state and the questions as a hosted call does and returns what it removed, per category.
+func redactKinds(state string, qs map[string]any) (string, map[string]any, map[string]int) {
+	sendState, _ := Scrub(state)
+	sendQs, _ := redactQuestions(qs)
+	kinds := RedactedKinds(state, sendState)
+	before, _ := json.Marshal(qs)
+	after, _ := json.Marshal(sendQs)
+	for k, n := range RedactedKinds(string(before), string(after)) {
+		kinds[k] += n
+	}
+	return sendState, sendQs, kinds
+}
+
+// Redactions is what a call to p would redact, per category (empty for a local endpoint). A cached answer to a hosted
+// call came from redacted text too, so its caller is told the same way.
+func Redactions(p Profile, state string, qs map[string]any) map[string]int {
+	if !Hosted(p.Expanded()) {
+		return nil
+	}
+	_, _, kinds := redactKinds(state, qs)
+	return kinds
 }
 
 // AskRaw is Ask without the shared LastRaw: it returns the response body too, so concurrent callers stay race-free.
@@ -696,11 +753,12 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 	redacted := 0
 	sendState, sendQs := state, qs
 	if Hosted(p) {
-		var n1, n2 int
-		sendState, n1 = Scrub(state)
-		sendQs, n2 = redactQuestions(qs)
-		redacted = n1 + n2
-		NoteRedacted(redacted)
+		var kinds map[string]int
+		sendState, sendQs, kinds = redactKinds(state, qs)
+		for _, n := range kinds {
+			redacted += n
+		}
+		NoteRedacted(kinds)
 	}
 	body, _ := json.Marshal(map[string]any{"model": p.Model, "state": sendState, "questions": sendQs})
 	t0 := time.Now()

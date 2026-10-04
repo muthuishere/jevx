@@ -181,7 +181,7 @@ About to write a config file to disk or into a commit.
 
 ```console
 $ jevx is "Does this line contain a password?" --in "DATABASE_URL=postgres://app:Pr0d-p4ss@db.internal:5432/app"
-jevx: redacted 1 item(s) (a secret, email or phone number) before this call to a hosted endpoint, so the model judged the text without them. The redaction itself means one was there; to judge the raw text, use a local endpoint.
+jevx: redacted 1 password (in a URL) before this call to a hosted endpoint, so the model judged the text without them. Each was present in the text; to judge the raw text, use a local endpoint.
 unsure 0.66
 ```
 
