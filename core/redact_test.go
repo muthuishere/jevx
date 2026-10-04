@@ -55,7 +55,7 @@ func TestHosted(t *testing.T) {
 // A hosted call must leave scrubbed, and the ledger must carry profile + caller + counts but never the payload.
 func TestHostedCallIsScrubbedAndLedgered(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("JEVX_LEDGER", "")
 	t.Setenv("JEVX_CALLER", "my-agent")
 	t.Setenv("SOME_SECRET_TOKEN", "s3cr3t-value-abcdefgh")
@@ -102,7 +102,7 @@ func TestHostedCallIsScrubbedAndLedgered(t *testing.T) {
 
 // A local (non-hosted) endpoint gets the payload as is: the owner's own model may see everything.
 func TestLocalCallIsNotScrubbed(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	ForceHosted = false
 	var sent []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

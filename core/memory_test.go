@@ -22,7 +22,7 @@ func writeFile(t *testing.T, path, body string) {
 // testMemory builds a memory over a temp folder: a wiki of three pages, a pinned notice, and a repo the pages cite.
 func testMemory(t *testing.T) (*Memory, string) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	dir, repo := t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(repo, "README.md"), "line one\nDefault port: 21118\nline three\n")
 	writeFile(t, filepath.Join(dir, "faq.md"), "# FAQ\n\n## What port does it use?\n21118 is the default port. [[openjevx:README.md:2-2]]\n\n## Licence\nApache-2.0, not MIT.\n")
@@ -184,7 +184,7 @@ func TestJSONStateWithAMemoryFieldStaysJSON(t *testing.T) {
 
 // Regression: the budget cut must not split a rune, and counts runes.
 func TestBudgetCutIsRuneSafe(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "tamil.md"), "# āāā\n\n"+strings.Repeat("ā சொல் word ", 80)+"\n")
 	m := &Memory{Name: "u", Dir: dir}
@@ -202,7 +202,7 @@ func TestBudgetCutIsRuneSafe(t *testing.T) {
 
 // should-fix 3: a short first stem segment does not name a page.
 func TestShortStemSegmentDoesNotNameAPage(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "go-generics.md"), "# Generics\n\nType parameters arrived in Go 1.18; constraints are interfaces, and the compiler instantiates generic code per shape.\n")
 	writeFile(t, filepath.Join(dir, "marketing-team.md"), "# Mission: marketing\n\nPost the approved pack, never on its own schedule.\n")
@@ -220,7 +220,7 @@ func TestShortStemSegmentDoesNotNameAPage(t *testing.T) {
 
 // should-fix 4 and 5: unreadable or escaping cites are reported, never stored as a hash.
 func TestUnverifiableAndEscapingCites(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	dir, repo := t.TempDir(), t.TempDir()
 	writeFile(t, filepath.Join(repo, "a.txt"), "one\ntwo\n")
 	writeFile(t, filepath.Join(filepath.Dir(repo), "secret.txt"), "outside\n")

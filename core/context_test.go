@@ -10,7 +10,7 @@ import (
 
 func TestWithContext(t *testing.T) {
 	home, repo := t.TempDir(), t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	_ = os.MkdirAll(filepath.Join(home, ".claude"), 0o755)
 	_ = os.WriteFile(filepath.Join(home, ".claude/CLAUDE.md"), []byte("# me\n\n## Jev\n\nglobal\n\n## Other\nno\n"), 0o644)

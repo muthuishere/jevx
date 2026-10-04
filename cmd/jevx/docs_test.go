@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,9 @@ import (
 func TestDocsUsageLinesMatchBinary(t *testing.T) {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "jevx")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
@@ -26,7 +30,7 @@ func TestDocsUsageLinesMatchBinary(t *testing.T) {
 		{"defaults", "set"}, {"profile", "add"}, {"profile", "bogus"}, {"plugin", "add"}, {"plugin", "bogus"}, {"hook"},
 		{"hook", "run"}, {"memory"}, {"cache", "bogus"}, {"config", "bogus"}, {"judge"}, {"context", "bogus"}} {
 		cmd := exec.Command(bin, args...)
-		cmd.Env = append(os.Environ(), "JEVX_CONFIG="+cfg, "HOME="+dir, "JEVX_LEDGER=off")
+		cmd.Env = append(os.Environ(), "JEVX_CONFIG="+cfg, "HOME="+dir, "USERPROFILE="+dir, "JEVX_LEDGER=off")
 		cmd.Stdin = strings.NewReader("")
 		out, _ := cmd.CombinedOutput()
 		for _, l := range strings.Split(string(out), "\n") {
