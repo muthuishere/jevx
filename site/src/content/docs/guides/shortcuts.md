@@ -64,9 +64,24 @@ ERROR 09:12:04 payment gateway timeout after 30s
 
 Prints every line with its P(yes), highest first. `--top N` keeps the first N.
 
-```bash title="Terminal"
-jevx rank "Is this about refunds?" --top 5 < results.txt
+```text title="results.txt"
+How to change your avatar
+Refund policy for annual plans
+Cancelling a subscription and getting money back
+Keyboard shortcuts
+Pricing of the enterprise plan
 ```
+
+```console
+$ jevx rank "Is this about refunds?" --top 5 < results.txt
+0.98  Refund policy for annual plans
+0.93  Cancelling a subscription and getting money back
+0.04  Pricing of the enterprise plan
+0.02  Keyboard shortcuts
+0.01  How to change your avatar
+```
+
+The second hit never says "refund", yet it ranks next: a sort by meaning, not by keyword. Every answer on this page is real output from hosted Jev (2026-10-04).
 
 :::note
 `filter` and `rank` refuse a saved choice or score question, since they need P(yes).
