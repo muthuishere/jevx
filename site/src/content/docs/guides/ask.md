@@ -3,7 +3,7 @@ title: Ask
 description: One command for every question, inline or saved, one input or a parallel batch, with verdicts, probabilities and exit codes an agent can branch on.
 ---
 
-`jevx ask` is the full command. The [shortcuts](/jevx/guides/shortcuts/) (`is`, `pick`, `filter`, `rank`) are `ask` with one question already shaped.
+Every answer on this page is real output from hosted Jev (2026-10-04). `jevx ask` is the full command. The [shortcuts](/jevx/guides/shortcuts/) (`is`, `pick`, `filter`, `rank`) are `ask` with one question already shaped.
 
 ```console
 $ jevx ask -h
@@ -12,16 +12,26 @@ Usage of ask:
     	NAME="QUESTION|key=desc;key2=desc" (repeat)
   -context value
     	background for this call: TEXT or @file (repeat); added after the ## Jev sections
+  -fresh
+    	ask the model again and refresh the stored answers (the cache is otherwise used)
   -in string
     	one input: text, a JSON object, @file or - (default: stdin)
   -json
     	one input: print JSON instead of lines
   -lines string
     	batch: a text file (or -), one input per line
+  -memory string
+    	a jevx memory: append its best-matching notes after the item (jevx memory list)
+  -memory-budget int
+    	with --memory: characters of notes (default 2000)
+  -memory-k int
+    	with --memory: BM25 sections after named and pinned pages (default 3)
+  -memory-strict
+    	with --memory: a number, code span or name in the input that the retrieved notes lack makes a yes/no answer no
   -min float
-    	override: choice / score confidence below is unsure (default -1)
+    	override: choice / score confidence below is unsure; -1 = the value from jevx defaults (default -1)
   -no float
-    	override: noul P at or below is no (default -1)
+    	override: noul P at or below is no; -1 = the value from jevx defaults (default -1)
   -no-context
     	skip the ## Jev sections of the global and folder agent files
   -noul value
@@ -33,13 +43,13 @@ Usage of ask:
   -questions string
     	a question-set file: {NAME: {type, instructions, criteria}}
   -raw
-    	one input: print the server's full response
+    	the full result as it is: the server's response for one input, JSONL (line, input, every answer) for a batch
   -score value
     	NAME="QUESTION|low;mid;high" (repeat, lowest first)
   -states string
     	batch: a JSONL file (or -), one JSON object or string per line
   -yes float
-    	override: noul P at or above is yes (default -1)
+    	override: noul P at or above is yes; -1 = the value from jevx defaults (default -1)
 ```
 
 ## Questions
@@ -79,17 +89,25 @@ jevx ask --json --noul spam="Is this message spam?" --in "Congratulations, you h
 ```
 
 ```json title="output"
-{"answers":{"spam":{"answer":{"type":"noul","noul":0.95},"verdict":"yes"}},"model":"jev-1.13.0","profile":"jev"}
+{"answers":{"spam":{"answer":{"type":"noul","noul":0.94},"verdict":"yes"}},"model":"jev-1.13.0","profile":"jev"}
 ```
 
 ## Output for a batch
 
-A batch prints a readable table, one row per input, in input order:
+A batch prints a readable table, one row per input, in input order. With this `app.log`:
+
+```text title="app.log"
+INFO  09:12:01 request served in 12ms
+ERROR 09:12:04 payment gateway timeout after 30s
+INFO  09:12:05 cache warmed
+```
+
 
 ```console
 $ jevx ask --lines app.log --noul err="Is this line an error or failure?"
 VERDICT  P     INPUT
-yes      0.98  ERROR 09:12:04 payment gateway timeout after 30s
+no       0.02  INFO  09:12:01 request served in 12ms
+yes      0.99  ERROR 09:12:04 payment gateway timeout after 30s
 no       0.02  INFO  09:12:05 cache warmed
 ```
 
@@ -103,7 +121,7 @@ jevx ask --lines app.log --noul err="Is this line an error or failure?" --raw
 
 ```json title="output" {2}
 {"line":1,"input":"INFO  09:12:01 request served in 12ms","answers":{"err":{"answer":{"type":"noul","noul":0.02},"p":0.02,"verdict":"no"}}}
-{"line":2,"input":"ERROR 09:12:04 payment gateway timeout after 30s","answers":{"err":{"answer":{"type":"noul","noul":0.98},"p":0.98,"verdict":"yes"}}}
+{"line":2,"input":"ERROR 09:12:04 payment gateway timeout after 30s","answers":{"err":{"answer":{"type":"noul","noul":0.99},"p":0.99,"verdict":"yes"}}}
 {"line":3,"input":"INFO  09:12:05 cache warmed","answers":{"err":{"answer":{"type":"noul","noul":0.02},"p":0.02,"verdict":"no"}}}
 ```
 
