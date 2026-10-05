@@ -66,6 +66,9 @@ jobs:
         run: npm run build
         working-directory: site
 
+      - name: Check internal links and anchors
+        run: python3 scripts/check_links.py site/dist /jevx/
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
