@@ -3,6 +3,11 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.8 (2026-10-05)
+
+- Memory never serves an edited page from an old index. `jevx memory list`, `memory show` and `ask --memory` compare each page with the index on every use: a page edited or removed since `jevx memory index` is left out of retrieval, a warning on stderr names what drifted (new pages are counted too), and `list` counts those pages as stale. Before, a stale index answered silently with the old text and `list` showed `0 stale`. jevx still never re-indexes on its own; run `jevx memory index NAME` after editing pages. See [Memory](/jevx/guides/memory/#freshness).
+- The installers' last line and the missing-key error say where to create a key: https://console.typesafe.ai/keys. The site's first page and Getting started link it too.
+
 ## v0.12.7 (2026-10-05)
 
 - Profiles can target Cloudflare Workers AI: `jevx profile add NAME URL --style cloudflare` sends the `{model, input}` envelope and unwraps the reply (including the nested `{state, result}` of `/ai/run`; a run that is not `Completed` is an error). The style is picked automatically for URLs containing `/ai/run`. It needs AI Gateway credit or your own provider key (BYOK); without either, Cloudflare answers 402. See [Config file](/jevx/reference/config/).
