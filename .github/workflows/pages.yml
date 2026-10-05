@@ -77,3 +77,30 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # When a push changes an installer, check the installer mirror once its edge cache (up to 10 min) has expired:
+  # each file must answer 200 with no redirect and be byte-identical to the file in this commit.
+  installer-mirror:
+    needs: deploy
+    runs-on: ubuntu-latest
+    env:
+      MIRROR: https://jevx.deemwar.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: check the mirrored installers
+        run: |
+          before=${{ github.event.before }}
+          if [ "${{ github.event_name }}" = push ] && ! echo "$before" | grep -q '^0*$' && \
+             ! git diff --name-only "$before" "$GITHUB_SHA" | grep -qx 'install\.sh\|install\.cmd'; then
+            echo "no installer change in this push"; exit 0
+          fi
+          sleep 660
+          for f in install.sh install.cmd; do
+            curl -sS -D h.txt -o got "$MIRROR/$f?nocache=$GITHUB_RUN_ID"
+            grep -q '^HTTP/[0-9.]* 200' h.txt || { echo "::error::$MIRROR/$f is not 200"; cat h.txt; exit 1; }
+            ! grep -qi '^location:' h.txt || { echo "::error::$MIRROR/$f redirects"; exit 1; }
+            [ "$(sha256sum < got)" = "$(sha256sum < $f)" ] || { echo "::error::$MIRROR/$f differs from this commit"; exit 1; }
+            echo "$MIRROR/$f: 200, identical"
+          done
