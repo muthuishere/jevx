@@ -3,6 +3,10 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.9 (2026-10-05)
+
+- Memory retrieval no longer lets a common word fill the notes. A page counts as named in an item when the item has its full name, or the first word of its name when no other page starts with that word: `model` no longer names both `model-card.md` and `model-from-object-storage.md`, which used up the note budget before the section that matched. On 1042 checked claims against a 16-page wiki, the notes now carry every number, code and name in the claim for all 1042 (before: 1012).
+
 ## v0.12.8 (2026-10-05)
 
 - Memory never serves an edited page from an old index. `jevx memory list`, `memory show` and `ask --memory` compare each page with the index on every use: a page edited or removed since `jevx memory index` is left out of retrieval, a warning on stderr names what drifted (new pages are counted too), and `list` counts those pages as stale. Before, a stale index answered silently with the old text and `list` showed `0 stale`. jevx still never re-indexes on its own; run `jevx memory index NAME` after editing pages. See [Memory](/jevx/guides/memory/#freshness).
