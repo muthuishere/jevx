@@ -21,10 +21,11 @@ Each one puts the `jevx` binary on your PATH, copies the agent skill into `~/.cl
 
 ## 2. Set your key
 
-jevx talks to hosted Jev out of the box. There is nothing to configure: put your key in the environment and you are done.
+jevx talks to hosted Jev out of the box. There is nothing to configure: create a key in the
+[TypeSafe console](https://console.typesafe.ai/keys), put it in the environment and you are done.
 
 ```bash title="~/.zshrc or ~/.bashrc"
-export TYPESAFE_API_KEY=...        # your key from typesafe.ai
+export TYPESAFE_API_KEY=...        # from console.typesafe.ai/keys
 ```
 
 jevx reads the variable when a request is sent and never writes it anywhere. Without it, every call stops with a clear

@@ -54,10 +54,11 @@ Every channel installs the binary from [the latest release](https://github.com/m
 `~/.agents/skills` (and `~/.codex/skills` if present), and hook entries are registered with every plugin **off**.
 `JEVX_NO_HOOK=1` installs the skills only. Later: `jevx install|uninstall [--skills] [--hooks]`.
 
-Set your key and you are done: jevx uses hosted Jev by default, with no config file.
+Set your key and you are done: jevx uses hosted Jev by default, with no config file. Create a key in the
+[TypeSafe console](https://console.typesafe.ai/keys).
 
 ```bash
-export TYPESAFE_API_KEY=...        # your key from typesafe.ai; read at request time, never written anywhere
+export TYPESAFE_API_KEY=...        # from console.typesafe.ai/keys; read at request time, never written anywhere
 ```
 
 Running your own System One endpoint (self-hosted, a local model, another provider)? Add a profile for it:
