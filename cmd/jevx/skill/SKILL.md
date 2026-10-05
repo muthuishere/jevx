@@ -103,8 +103,8 @@ jevx is "Is this a critical bug?" --cwd ~/repos/payments < report.txt   # read t
 jevx is "Is this spam?" --no-context < msg.txt                          # skip the ## Jev sections for this call
 jevx context                                                           # show what is sent, and from which file
 ```
-The same message scored 0.84 with no context, 0.94 with "the meeting is in 20 minutes" and 0.64 (unsure) with "the
-meeting is in three months". Pass the facts that decide it. Any heading level works (`#jev`, `## Jev`, `### Jev notes`). The section ends at the next heading of the same or a
+"Can you send me the Q3 revenue numbers before the board meeting?" scored unsure 0.74 with no context, yes 0.93 with
+"The board meeting starts in 20 minutes." and unsure 0.25 with "... is in three months" (hosted Jev). Pass the facts that decide it. Any heading level works (`#jev`, `## Jev`, `### Jev notes`). The section ends at the next heading of the same or a
 higher level, and it may be empty. The
 heading name and the files can be changed in config (`local_context_section`, `local_context_file`,
 `global_context_file`). If the context looks wrong, tell the user which file to edit. Do not edit it yourself.

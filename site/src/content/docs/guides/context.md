@@ -48,7 +48,19 @@ jevx is "Is this spam?" --no-context < msg.txt                          # skip t
 
 The item being judged always goes **first** and the context after it (capped at 4000 characters), because a server keeps only its first N tokens: context in front could push the item out of the model's view. A JSON input keeps its shape and gets the context as its last field, `"context"`.
 
-The skill's own example, from the maintainer: the same message scored 0.84 with no context, 0.94 with "the meeting is in 20 minutes" and 0.64 (unsure) with "the meeting is in three months". That one was not re-run for these docs.
+The same message, the saved `urgent` question ("Is this urgent for the person receiving it?") and three contexts, against hosted Jev (2026-10-04, two runs agreed within 0.01):
+
+```console
+$ M="Can you send me the Q3 revenue numbers before the board meeting?"
+$ echo "$M" | jevx ask urgent
+urgent           unsure     0.74
+$ echo "$M" | jevx ask urgent --context "The board meeting starts in 20 minutes."
+urgent           yes        0.93
+$ echo "$M" | jevx ask urgent --context "The board meeting is in three months."
+urgent           unsure     0.25
+```
+
+The facts that decide it are in the context, not in the message.
 
 ## Why the CLI never writes it
 
