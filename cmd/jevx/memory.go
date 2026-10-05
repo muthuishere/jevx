@@ -33,7 +33,18 @@ func cmdMemory(args []string) {
 				pr("%-16s error: %v", n, err)
 				continue
 			}
-			pr("%-16s %4d sections  %2d stale  %s  indexed %s", n, len(m.Sections), len(m.Stale), m.Dir, m.Indexed.Format("2006-01-02 15:04"))
+			changed, added := m.Drift()
+			stale := len(m.Stale)
+			for p := range changed {
+				if _, ok := m.Stale[p]; !ok {
+					stale++
+				}
+			}
+			line := fmt.Sprintf("%-16s %4d sections  %2d stale  %s  indexed %s", n, len(m.Sections), stale, m.Dir, m.Indexed.Format("2006-01-02 15:04"))
+			if len(changed) > 0 || len(added) > 0 {
+				line += fmt.Sprintf("  (%d changed, %d new since index: jevx memory index %s)", len(changed), len(added), n)
+			}
+			pr("%s", line)
 		}
 	case "add":
 		fs := flag.NewFlagSet("memory add", flag.ExitOnError)
@@ -98,6 +109,7 @@ func cmdMemory(args []string) {
 		if err != nil {
 			die("%v", err)
 		}
+		warnDrift(m)
 		hits := m.Retrieve(names[1], *k, *budget)
 		if *asJSON {
 			b, _ := json.Marshal(map[string]any{"hits": hits, "diff": core.MemDiff(names[1], hits)})
@@ -137,6 +149,14 @@ func indexAndSave(m *core.Memory) {
 }
 
 // printUnverifiable warns about cites that could not be read at index time: check cannot vouch for those pages.
+// warnDrift leaves pages edited since the index out of retrieval and says so on stderr, so an out-of-date index is
+// never served silently.
+func warnDrift(m *core.Memory) {
+	if w := m.Freshen(); w != "" {
+		fmt.Fprintf(os.Stderr, "jevx: %s\n", w)
+	}
+}
+
 func printUnverifiable(m *core.Memory) {
 	pages := make([]string, 0, len(m.Unverifiable))
 	for p := range m.Unverifiable {

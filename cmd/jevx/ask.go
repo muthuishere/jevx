@@ -312,6 +312,7 @@ func cmdAsk(args []string) {
 		if err != nil {
 			die("%v", err)
 		}
+		warnDrift(m)
 		mem = &memAsk{m: m, k: *memK, budget: *memBudget, strict: *memStrict}
 	}
 	core.Retries, core.LedgerOn = *set.Retries, *set.Ledger

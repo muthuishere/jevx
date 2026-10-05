@@ -140,6 +140,37 @@ func TestCheckMarksStalePagesAndRetrievalSkipsThem(t *testing.T) {
 	}
 }
 
+func TestEditedPageIsNeverServedFromAnOldIndex(t *testing.T) {
+	m, _ := testMemory(t)
+	if w := m.Freshen(); w != "" {
+		t.Fatalf("fresh index: %q", w)
+	}
+	writeFile(t, filepath.Join(m.Dir, "faq.md"), "# FAQ\n\nThe port is now 21300.\n")
+	writeFile(t, filepath.Join(m.Dir, "new.md"), "# New\n\nbash-guard blocks rm -rf\n")
+	w := m.Freshen()
+	if !strings.Contains(w, "1 pages changed or removed and 1 new") || !strings.Contains(w, "jevx memory index t") {
+		t.Fatalf("drift warning: %q", w)
+	}
+	for _, h := range m.Retrieve("Which port does the server use?", 3, 2000) {
+		if h.Page == "faq.md" {
+			t.Fatalf("an edited page must not be served from the old index: %+v", h)
+		}
+	}
+	if err := m.Index(); err != nil {
+		t.Fatal(err)
+	}
+	if w := m.Freshen(); w != "" {
+		t.Fatalf("after index: %q", w)
+	}
+	found := false
+	for _, h := range m.Retrieve("bash-guard rm -rf", 1, 2000) {
+		found = found || (h.Page == "new.md" && h.Why == "bm25")
+	}
+	if !found {
+		t.Fatal("after index the new page is retrieved")
+	}
+}
+
 func TestSaveLoadAndNames(t *testing.T) {
 	m, _ := testMemory(t)
 	if err := m.Save(); err != nil {

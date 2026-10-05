@@ -37,6 +37,15 @@ jevx ask --memory docs --memory-strict --lines claims.txt --noul true="Is this c
 
 Every cite in a page (`app:path:L10-L20`) is hashed when the page is indexed. `jevx memory check` re-hashes them: a page whose cited lines changed is marked stale and is not retrieved until you fix it and re-index. Lines that only moved (lines inserted above them) are recognised and not flagged.
 
+Pages themselves are checked on every use: `list`, `show` and `ask --memory` hash each page against the index. A page edited or removed since `index` is left out of retrieval (its indexed text is out of date) and a warning names what drifted, with new pages counted too:
+
+```console
+$ jevx memory list
+jevwiki   259 sections   9 stale  ~/wiki  indexed 2026-10-04 10:06  (9 changed, 1 new since index: jevx memory index jevwiki)
+```
+
+Run `jevx memory index NAME` after you edit pages. jevx never re-indexes on its own, because that would re-baseline the cite hashes `check` compares against.
+
 ## How well it works
 
 Measured on held-out claims, with the configuration frozen before each test (k 3, budget 2000, item first). The largest run comes first; it is the most reliable, and its effect is smaller than the earlier, smaller runs showed.

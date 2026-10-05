@@ -276,15 +276,7 @@ func sum(b []byte) string { h := sha256.Sum256(b); return hex.EncodeToString(h[:
 // Check marks a page stale when the page itself changed since `index`, or when any line range it cites changed in
 // the configured repo. Stale pages are left out of retrieval until the page is fixed and re-indexed.
 func (m *Memory) Check() map[string]string {
-	stale := map[string]string{}
-	for page, h := range m.PageHash {
-		b, err := os.ReadFile(filepath.Join(m.Dir, filepath.FromSlash(page)))
-		if err != nil {
-			stale[page] = "page missing"
-		} else if sum(b) != h {
-			stale[page] = "page changed since index (run jevx memory index)"
-		}
-	}
+	stale, _ := m.Drift()
 	for page, cs := range m.Cites {
 		if _, done := stale[page]; done {
 			continue
@@ -301,6 +293,49 @@ func (m *Memory) Check() map[string]string {
 	}
 	m.Stale = stale
 	return stale
+}
+
+// Drift compares the folder with the index: pages edited or removed since `index`, and .md pages the index has not
+// seen. It reads every page, so the answer is never older than the files.
+func (m *Memory) Drift() (changed map[string]string, added []string) {
+	changed = map[string]string{}
+	for page, h := range m.PageHash {
+		b, err := os.ReadFile(filepath.Join(m.Dir, filepath.FromSlash(page)))
+		if err != nil {
+			changed[page] = "page missing"
+		} else if sum(b) != h {
+			changed[page] = "page changed since index (run jevx memory index)"
+		}
+	}
+	_ = filepath.WalkDir(m.Dir, func(p string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".md") {
+			return nil
+		}
+		rel, _ := filepath.Rel(m.Dir, p)
+		if _, ok := m.PageHash[filepath.ToSlash(rel)]; !ok {
+			added = append(added, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	sort.Strings(added)
+	return changed, added
+}
+
+// Freshen leaves pages that changed on disk since `index` out of retrieval (their indexed text is out of date), without
+// saving, and returns a one-line warning naming what drifted, or "" when the index matches the folder.
+func (m *Memory) Freshen() string {
+	changed, added := m.Drift()
+	if len(changed) == 0 && len(added) == 0 {
+		return ""
+	}
+	if m.Stale == nil {
+		m.Stale = map[string]string{}
+	}
+	for p, why := range changed {
+		m.Stale[p] = why
+	}
+	return fmt.Sprintf("memory %s: %d pages changed or removed and %d new since index %s; changed pages are left out until: jevx memory index %s",
+		m.Name, len(changed), len(added), m.Indexed.Format("2006-01-02 15:04"), m.Name)
 }
 
 var memStop = map[string]bool{}
