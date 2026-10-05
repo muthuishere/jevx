@@ -58,6 +58,7 @@ An illustrative file with every top-level field (values are examples, not defaul
 | `url` | the System One endpoint |
 | `model` | the model name sent with each request |
 | `headers` | header name → value; `$VAR` / `${VAR}` expanded per request |
+| `style` | request shape: `typesafe` (the flat System One body, the default) or `cloudflare` (a `{model, input}` envelope whose `{result, success}` reply is unwrapped; a failed envelope is an error with Cloudflare's message). Empty means `typesafe`, except that a URL containing `/ai/run` is treated as `cloudflare`. Set it with `jevx profile add NAME URL --style cloudflare`. |
 | `questions` | optional question pack (JSON) for `judge` |
 | `defaults` | settings that apply only when this profile is used |
 | `note` | free text |

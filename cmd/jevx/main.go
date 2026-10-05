@@ -572,6 +572,9 @@ func cmdProfile(args []string) {
 			}
 			hm[strings.TrimSpace(k)] = strings.TrimSpace(v)
 		}
+		if *st != "typesafe" && *st != "cloudflare" {
+			die("--style: want typesafe or cloudflare, got %q", *st)
+		}
 		cfg.Profiles[args[1]] = core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Style: *st}
 		if ph, ok := cfg.Profiles["default"]; ok && ph.URL == "" && args[1] != "default" {
 			delete(cfg.Profiles, "default") // the seeded placeholder is replaced by the first real profile
