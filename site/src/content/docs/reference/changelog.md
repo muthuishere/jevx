@@ -3,6 +3,11 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.7 (2026-10-05)
+
+- Profiles can target Cloudflare Workers AI: `jevx profile add NAME URL --style cloudflare` sends the `{model, input}` envelope and unwraps the reply (including the nested `{state, result}` of `/ai/run`; a run that is not `Completed` is an error). The style is picked automatically for URLs containing `/ai/run`. It needs AI Gateway credit or your own provider key (BYOK); without either, Cloudflare answers 402. See [Config file](/jevx/reference/config/).
+- The agent skill's context example is a real, reproducible run: "Can you send me the Q3 revenue numbers before the board meeting?" goes from unsure 0.74 (no context) to yes 0.93 ("the meeting starts in 20 minutes") to unsure 0.25 ("in three months").
+
 ## v0.12.6 (2026-10-05)
 
 - The redaction notice names what it removed, by category, never the values: `jevx: redacted 1 password (in a URL), 1 email-shaped (user@host) ...`. Before, it said only "N item(s)". The `user@host` part of a connection URL such as `postgres://app@db.internal` matches the email rule, so the notice calls it email-shaped instead of hiding why the hostname was removed.
