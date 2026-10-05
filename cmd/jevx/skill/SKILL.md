@@ -68,6 +68,9 @@ jevx ask --memory docs --memory-strict --lines claims.txt --noul true="Is this c
   A strict "no" flags the claim for a person (say so in your report); it never decides alone.
 - It adds facts, not reasoning. The strict rule checks presence, not negation ("not MIT" contains MIT).
 - `jevx memory check NAME` marks pages whose cited lines changed as stale; run it (and `index`) after docs change.
+- If stderr says `jevx: memory NAME: N pages changed or removed and M new since index ...`, those pages are left out
+  of retrieval until `jevx memory index NAME`. Run it when you edited the docs yourself; otherwise tell the user, and
+  say in your report that verdicts were judged without those pages.
 
 ## Repeat calls are free: the answer cache
 
