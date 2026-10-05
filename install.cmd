@@ -23,7 +23,7 @@ if errorlevel 1 (
 )
 "%JEVX_BIN%\jevx.exe" version
 if "%JEVX_NO_HOOK%"=="" ("%JEVX_BIN%\jevx.exe" install) else ("%JEVX_BIN%\jevx.exe" install --skills)
-echo jevx: next: set TYPESAFE_API_KEY=...   (your key from typesafe.ai; hosted Jev needs nothing else)
+echo jevx: next: set TYPESAFE_API_KEY=...   (key: console.typesafe.ai/keys; hosted Jev needs nothing else)
 echo       then:  echo Prod is down ^| jevx is "Is this urgent?"     own endpoint: jevx profile add NAME URL --model M
 echo %PATH% | find /I "%JEVX_BIN%" >nul || (
   powershell -NoProfile -Command "$p=[Environment]::GetEnvironmentVariable('Path','User'); [Environment]::SetEnvironmentVariable('Path', ($p.TrimEnd(';')+';%JEVX_BIN%').TrimStart(';'), 'User')"

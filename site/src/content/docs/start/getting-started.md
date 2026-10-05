@@ -33,7 +33,7 @@ message and exit code `4` (never a fake "no"):
 
 ```console
 $ echo "Prod is down" | jevx is "Is this urgent?"
-jevx: set your Jev API key: export TYPESAFE_API_KEY=... (from typesafe.ai). Or use another endpoint: jevx profile add NAME URL --model M --header 'Authorization: Bearer $YOUR_VAR' && jevx profile use NAME
+jevx: set your Jev API key: export TYPESAFE_API_KEY=... (create one at https://console.typesafe.ai/keys). Or use another endpoint: jevx profile add NAME URL --model M --header 'Authorization: Bearer $YOUR_VAR' && jevx profile use NAME
 ```
 
 ### Optional: your own endpoint

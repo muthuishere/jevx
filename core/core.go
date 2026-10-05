@@ -333,7 +333,7 @@ func (c Config) Profile(name string) (string, Profile, error) {
 func NeedKeyHelp(name string, p Profile) string {
 	v := MissingEnv(p)
 	if name == BuiltinName && v == "TYPESAFE_API_KEY" {
-		return "set your Jev API key: export TYPESAFE_API_KEY=... (from typesafe.ai). Or use another endpoint: jevx profile add NAME URL --model M --header 'Authorization: Bearer $YOUR_VAR' && jevx profile use NAME"
+		return "set your Jev API key: export TYPESAFE_API_KEY=... (create one at https://console.typesafe.ai/keys). Or use another endpoint: jevx profile add NAME URL --model M --header 'Authorization: Bearer $YOUR_VAR' && jevx profile use NAME"
 	}
 	return fmt.Sprintf("profile %s needs %s in the environment: export %s=...", name, v, v)
 }

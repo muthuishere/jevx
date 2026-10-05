@@ -27,5 +27,5 @@ mkdir -p "$BIN"; mv "$tmp/jevx" "$BIN/jevx"
 echo "jevx: installed $("$BIN/jevx" version) to $BIN/jevx"
 if [ -n "${JEVX_NO_HOOK:-}" ]; then "$BIN/jevx" install --skills; else "$BIN/jevx" install; fi
 case ":$PATH:" in *":$BIN:"*) ;; *) echo "jevx: add $BIN to your PATH" ;; esac
-echo "jevx: next: export TYPESAFE_API_KEY=...   (your key from typesafe.ai; hosted Jev needs nothing else)"
+echo "jevx: next: export TYPESAFE_API_KEY=...   (key: console.typesafe.ai/keys; hosted Jev needs nothing else)"
 echo "      then:  echo \"Prod is down\" | jevx is \"Is this urgent?\"     own endpoint: jevx profile add NAME URL --model M"
