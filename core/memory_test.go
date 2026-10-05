@@ -171,6 +171,33 @@ func TestEditedPageIsNeverServedFromAnOldIndex(t *testing.T) {
 	}
 }
 
+// Regression (jevresearch shadow, claim d15a9da81dfb): "model" named model-card.md and model-from-object-storage.md,
+// which filled the budget before the section that holds the claim's numbers.
+func TestSharedFirstWordNamesNoPage(t *testing.T) {
+	setHome(t, t.TempDir())
+	dir := t.TempDir()
+	filler := strings.Repeat("weights folder layout and reload steps ", 30)
+	writeFile(t, filepath.Join(dir, "model-card.md"), "# The model folder\n\n"+filler+"\n")
+	writeFile(t, filepath.Join(dir, "model-from-object-storage.md"), "# Hot swap\n\n"+filler+"\n")
+	writeFile(t, filepath.Join(dir, "use-cases.md"), "# Measured\n\nThe local model was worse on every task: AUC 0.76 vs 0.83.\n")
+	m := &Memory{Name: "s", Dir: dir}
+	if err := m.Index(); err != nil {
+		t.Fatal(err)
+	}
+	hits := m.Retrieve("The local model was worse: AUC 0.76 vs 0.83", 3, 600)
+	if len(hits) == 0 || hits[0].Page != "use-cases.md" {
+		t.Fatalf("the matching section comes first, no page is named by a shared first word: %+v", hits)
+	}
+	for _, h := range hits {
+		if h.Why == "named" {
+			t.Fatalf("named by a shared first word: %+v", h)
+		}
+	}
+	if h := m.Retrieve("see model-card for the folder", 0, 2000); len(h) != 1 || h[0].Page != "model-card.md" || h[0].Why != "named" {
+		t.Fatalf("the full page name still names it: %+v", h)
+	}
+}
+
 func TestSaveLoadAndNames(t *testing.T) {
 	m, _ := testMemory(t)
 	if err := m.Save(); err != nil {

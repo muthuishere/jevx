@@ -473,11 +473,21 @@ func (m *Memory) Retrieve(input string, k, budget int) []MemHit {
 			order, why[i] = append(order, i), w
 		}
 	}
+	stemOf := func(p string) (string, string) {
+		stem := strings.ToLower(strings.TrimSuffix(filepath.Base(p), ".md"))
+		return stem, strings.SplitN(stem, "-", 2)[0]
+	}
+	firsts := map[string]int{}
+	for p := range pages {
+		_, first := stemOf(p)
+		firsts[first]++
+	}
 	var named []string
 	for p := range pages {
-		stem := strings.ToLower(strings.TrimSuffix(filepath.Base(p), ".md"))
-		first := strings.SplitN(stem, "-", 2)[0] // "marketing-team.md" is named by "marketing"; a short first part ("go-", "how-") is not enough
-		if toks[stem] || (len([]rune(first)) >= 4 && toks[first]) {
+		// "marketing-team.md" is named by "marketing"; a short first part ("go-", "how-") is not enough, and neither is
+		// one that starts several page names ("model" in model-card.md and model-from-object-storage.md names neither)
+		stem, first := stemOf(p)
+		if toks[stem] || (len([]rune(first)) >= 4 && firsts[first] == 1 && toks[first]) {
 			named = append(named, p)
 		}
 	}
