@@ -9,6 +9,8 @@
 #   REMOTE               where to push (default git@github.com:muthuishere/jevx.git)
 #   SITE_URL             the docs site to verify (default https://muthuishere.github.io/jevx)
 #   SEAL_ALLOW           comma list of secret names `sec seal --check` may report as false positives
+#   INSTALLER_MIRRORS    space-separated site URLs that serve copies of install.sh / install.cmd; each copy must be
+#                        byte-identical to the one on SITE_URL after the release
 #   DRY_RUN=1            run the checks and print the next tag, change nothing
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -103,4 +105,16 @@ check_site() {
   die "$1 header shows $(header "$1"), not $next"
 }
 check_site "$SITE_URL"
+check_mirrors() { # every mirror serves the same installers as the docs site (200, same bytes)
+  local f m bad=0
+  for f in install.sh install.cmd; do
+    want=$(curl -fsS "$SITE_URL/$f?nocache=$RANDOM" | sha256sum)
+    for m in ${INSTALLER_MIRRORS:-}; do
+      got=$(curl -fsS "$m/$f?nocache=$RANDOM" | sha256sum) || got=unreachable
+      if [ "$got" = "$want" ]; then echo "  $m/$f: identical"; else echo "  $m/$f: DRIFT"; bad=1; fi
+    done
+  done
+  return $bad
+}
+[ -z "${INSTALLER_MIRRORS:-}" ] || check_mirrors || die "an installer mirror differs from $SITE_URL (edge cache is up to 10 min: re-check before acting)"
 say "released $next"
