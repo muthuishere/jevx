@@ -14,13 +14,17 @@ import (
 // error carrying Cloudflare's message, never an answer.
 func TestCloudflareStyle(t *testing.T) {
 	var got map[string]any
-	ok := true
+	ok, nested, state := true, false, "Completed"
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		got = nil
 		_ = json.Unmarshal(b, &got)
 		if !ok {
 			io.WriteString(w, `{"success":false,"errors":[{"code":2021,"message":"Insufficient balance"}],"result":null}`)
+			return
+		}
+		if nested {
+			io.WriteString(w, `{"success":true,"errors":[],"result":{"state":"`+state+`","result":{"model":"m","answers":{"a":{"type":"noul","noul":0.9}}}}}`)
 			return
 		}
 		io.WriteString(w, `{"success":true,"errors":[],"result":{"model":"m","answers":{"a":{"type":"noul","noul":0.9}}}}`)
@@ -42,6 +46,17 @@ func TestCloudflareStyle(t *testing.T) {
 			t.Fatalf("%s: want the envelope error, got %v", p.URL, err)
 		}
 	}
+	// The real Workers AI reply nests {state, result}; Completed is unwrapped, anything else is an error.
+	p := Profile{URL: s.URL + "/x", Model: "typesafe/jev", Style: "cloudflare"}
+	ok, nested = true, true
+	if ans, _, err := AskRaw(p, "item", qs, 5*time.Second); err != nil || ans["a"].P() != 0.9 {
+		t.Fatalf("nested Completed: %v %+v", err, ans)
+	}
+	state = "Queued"
+	if _, _, err := AskRaw(p, "item", qs, 5*time.Second); err == nil || !strings.Contains(err.Error(), "Queued") {
+		t.Fatalf("nested Queued: want an error naming the state, got %v", err)
+	}
+	nested, state = false, "Completed"
 	// The default style stays the flat System One body.
 	ok = true
 	if _, _, err := AskRaw(Profile{URL: s.URL + "/v1/systemone", Model: "m"}, "item", qs, 5*time.Second); err == nil {

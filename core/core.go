@@ -805,6 +805,19 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 			err = fmt.Errorf("%s: %s", p.URL, msg)
 		} else {
 			raw = env.Result
+			// The Workers AI /ai/run reply nests once more: {"state": "Completed", "result": {model, answers}}.
+			// Any other state (queued, running, failed) is not an answer; say so instead of reading it as one.
+			var inner struct {
+				State  string          `json:"state"`
+				Result json.RawMessage `json:"result"`
+			}
+			if json.Unmarshal(raw, &inner) == nil && inner.State != "" {
+				if inner.State != "Completed" {
+					err = fmt.Errorf("%s: cloudflare run state %q, not Completed", p.URL, inner.State)
+				} else {
+					raw = inner.Result
+				}
+			}
 		}
 	}
 	var out struct {
