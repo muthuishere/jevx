@@ -62,6 +62,8 @@ Notes help (McNemar p=0.0004), and `--memory-strict` helps on top of them (p=0.0
 
 **The weak spot is a changed number.** A note that matches except for one figure pulls the answer toward "true": with notes alone, 50 of 72 changed numbers were caught. `--memory-strict` compares the numbers, `` `code` `` and names in the item with those in the retrieved notes and fails a yes/no claim when one is missing. On its own, the rule flags a true claim wrongly only when the right section was not among the retrieved ones; a wider retrieval window was tested and did not help, so the defaults stay.
 
+**Retrieval coverage, no model involved.** For each of 1042 verified-true claims from a 16-page wiki (two independent verifiers, cites checked), `jevx memory show NAME CLAIM --json` was run and its `diff` read: an empty diff means the retrieved notes hold every number, `` `code` `` and name of the claim, so `--memory-strict` cannot wrongly fail it. v0.12.8: 1012 / 1042. v0.12.9: **1042 / 1042**. The 30 misses were claims with a common word (`model`) that two page names start with; both pages were offered first and used up the budget. With full coverage, a true claim that still comes back "no" is the model misreading its notes, not missing them.
+
 **Earlier, smaller runs** (same method, kept for the record):
 
 | run | without notes | with notes | `--memory-strict` |
