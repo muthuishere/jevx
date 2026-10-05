@@ -560,7 +560,7 @@ func cmdProfile(args []string) {
 	case "add":
 		need(3, "add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE]")
 		fs := flag.NewFlagSet("profile add", flag.ExitOnError)
-		m, q := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON")
+		m, q, st := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON"), fs.String("style", "typesafe", "request shape: typesafe (flat body) or cloudflare ({model, input} envelope)")
 		var hdr multi
 		fs.Var(&hdr, "header", `request header "Name: value" (repeat); reference env vars for secrets: "Authorization: Bearer $JEV_API_KEY"`)
 		_ = fs.Parse(args[3:])
@@ -572,7 +572,7 @@ func cmdProfile(args []string) {
 			}
 			hm[strings.TrimSpace(k)] = strings.TrimSpace(v)
 		}
-		cfg.Profiles[args[1]] = core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q}
+		cfg.Profiles[args[1]] = core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Style: *st}
 		if ph, ok := cfg.Profiles["default"]; ok && ph.URL == "" && args[1] != "default" {
 			delete(cfg.Profiles, "default") // the seeded placeholder is replaced by the first real profile
 		}

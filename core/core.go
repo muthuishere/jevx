@@ -75,6 +75,7 @@ func expand(p string) string {
 type Profile struct {
 	URL       string            `json:"url"`
 	Model     string            `json:"model"`
+	Style     string            `json:"style,omitempty"`     // request shape: typesafe (flat {model,state,questions}, the default) or cloudflare ({model, input} envelope with a {result,...} reply)
 	Headers   map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
 	Questions string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
 	Note      string            `json:"note,omitempty"`
@@ -760,7 +761,18 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 		}
 		NoteRedacted(kinds)
 	}
-	body, _ := json.Marshal(map[string]any{"model": p.Model, "state": sendState, "questions": sendQs})
+	core := map[string]any{"state": sendState, "questions": sendQs}
+	// Cloudflare's universal /ai/run is an envelope: {"model": ..., "input": {...}} with a
+	// {"result": ..., "success": ...} reply (Cloudflare REST 2026-10). Detect and adapt; the
+	// System One contract stays the default everywhere else.
+	isCF := p.Style == "cloudflare" || (p.Style == "" && strings.Contains(p.URL, "/ai/run"))
+	var body []byte
+	if isCF {
+		body, _ = json.Marshal(map[string]any{"model": p.Model, "input": core})
+	} else {
+		core["model"] = p.Model
+		body, _ = json.Marshal(core)
+	}
 	t0 := time.Now()
 	var raw []byte
 	var err error
@@ -772,6 +784,27 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 		raw, retry, err = post(p, body, timeout)
 		if err == nil || !retry {
 			break
+		}
+	}
+	if isCF && err == nil {
+		var env struct {
+			Result  json.RawMessage `json:"result"`
+			Success bool            `json:"success"`
+			Errors  []struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"errors"`
+		}
+		if e := json.Unmarshal(raw, &env); e != nil || !env.Success {
+			msg := "cloudflare envelope: unknown error"
+			if e == nil && len(env.Errors) > 0 {
+				msg = env.Errors[0].Message
+			} else if e == nil {
+				msg = strings.TrimSpace(string(raw[:min(200, len(raw))]))
+			}
+			err = fmt.Errorf("%s: %s", p.URL, msg)
+		} else {
+			raw = env.Result
 		}
 	}
 	var out struct {
