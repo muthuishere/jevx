@@ -185,7 +185,7 @@ jevx: redacted 1 password (in a URL) before this call to a hosted endpoint, so t
 unsure 0.66
 ```
 
-**Next:** Treats the redaction notice as the answer: a secret is there, so it replaces the value with an environment variable reference before writing. jevx scrubs secrets, emails and phone numbers before any call to a hosted endpoint, so the model never sees the password and cannot say yes; the notice (stderr, values never printed) is the signal. To have the model judge the raw text, ask a local endpoint (`--profile local`).
+**Next:** Treats the redaction notice as the answer: a secret is there, so it replaces the value with an environment variable reference before writing. jevx scrubs secrets, emails and phone numbers before any call to a hosted endpoint, so the model never sees the password and cannot say yes; the notice (stderr, values never printed) is the signal. To have the model judge the raw text, ask a local endpoint (`--profile openjevx`).
 
 ### Did the build succeed?
 

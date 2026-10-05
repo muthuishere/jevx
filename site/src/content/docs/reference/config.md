@@ -18,9 +18,9 @@ An illustrative file with every top-level field (values are examples, not defaul
       "model": "MODEL",
       "headers": { "Authorization": "Bearer $YOUR_KEY_VAR" }
     },
-    "local": {
-      "url": "http://127.0.0.1:21131/v1/systemone",
-      "model": "my-model",
+    "openjevx": {
+      "url": "http://127.0.0.1:21160/v1/systemone",
+      "model": "openjevx",
       "defaults": { "parallel": 4 }
     }
   },

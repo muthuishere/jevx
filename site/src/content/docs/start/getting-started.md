@@ -43,19 +43,19 @@ provider), add a **profile**: a URL, a model and headers. `$VAR` in any of them 
 stay out of the config file.
 
 ```bash title="Terminal"
-jevx profile add local http://127.0.0.1:21131/v1/systemone --model myjev        # a local model: no key needed
+jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # a local openjevx (its default port since v0.5.11): no key needed
 jevx profile add acme https://jev.acme.dev/v1/systemone --model jev-latest --header "Authorization: Bearer $ACME_KEY"
 ```
 
 ```console
 $ jevx profile list
 * jev        https://api.typesafe.ai/v1/systemone  model=jev-latest  Authorization: Bearer $TYPESAFE_API_KEY  (built in)
-  local      http://127.0.0.1:21131/v1/systemone  model=myjev
+  openjevx   http://127.0.0.1:21160/v1/systemone  model=openjevx
 (* = default; change with: jevx profile use NAME)
 ```
 
-The built-in `jev` stays the default. Use a custom one for a single call with `--profile local`, or make it the default
-with `jevx profile use local`.
+The built-in `jev` stays the default. Use a custom one for a single call with `--profile openjevx`, or make it the default
+with `jevx profile use openjevx`.
 
 ## 3. Ask something
 

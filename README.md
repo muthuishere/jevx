@@ -64,7 +64,7 @@ export TYPESAFE_API_KEY=...        # from console.typesafe.ai/keys; read at requ
 Running your own System One endpoint (self-hosted, a local model, another provider)? Add a profile for it:
 
 ```bash
-jevx profile add local http://127.0.0.1:21131/v1/systemone --model myjev     # then --profile local, or: jevx profile use local
+jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # openjevx's default port (v0.5.11+); then --profile openjevx
 ```
 
 ## Quickstart

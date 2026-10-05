@@ -207,7 +207,7 @@ skill works but plugins do not run yet.
 ```bash
 curl -fsSL https://muthuishere.github.io/jevx/install.sh | sh      # this skill for Claude Code, Codex and ~/.agents
 export TYPESAFE_API_KEY=...   # the user's key: hosted Jev works with no config at all
-jevx profile add local http://127.0.0.1:21131/v1/systemone --model myjev   # only for a custom endpoint
+jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # only for a custom endpoint (a local openjevx here)
 ```
 If a call exits 4 asking for `TYPESAFE_API_KEY` (or another variable), tell the user which variable to set. Do not
 guess one, and never ask them to paste a key into the chat.
@@ -218,7 +218,7 @@ Before a call to a hosted endpoint, jevx removes secrets, emails and phone numbe
 When it does, it prints one stderr line naming what it removed, by category and never the values, e.g. `jevx: redacted
 1 password (in a URL) ...`. Read that line as an answer: the text holds that item, even if the verdict says `unsure`.
 `email-shaped (user@host)` can also be the user and host of a connection URL, not only an email address. To have the model judge the raw text, use
-a local endpoint (`--profile local`).
+a local endpoint (`--profile openjevx`).
 
 ## Never
 - Use it as a safety gate. Permissions, money, legal and irreversible calls stay with the user.

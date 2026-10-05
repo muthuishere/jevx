@@ -40,7 +40,7 @@ The third column says where the value comes from: `default`, `config`, or `profi
 
 ```bash title="Terminal"
 jevx defaults set yes 0.85
-jevx defaults set parallel 4 --profile myjev     # only when that profile is used
+jevx defaults set parallel 4 --profile openjevx  # only when that profile is used
 jevx defaults unset yes
 ```
 

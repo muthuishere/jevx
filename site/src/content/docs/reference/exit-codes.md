@@ -16,7 +16,7 @@ The rule the code enforces: an error exits `4`, never `1`. A dead endpoint canno
 
 ```console
 $ jevx is "Is this urgent?" --profile nope --in "x"; echo "exit $?"
-jevx: no profile "nope" (have: jev, myjev)
+jevx: no profile "nope" (have: jev, openjevx)
 exit 4
 ```
 
