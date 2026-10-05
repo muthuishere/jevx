@@ -3,6 +3,12 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.10 (2026-10-06)
+
+- The local-endpoint example in the agent skill, README and docs is openjevx on its default port since openjevx v0.5.11: `jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx`. jevx ships no openjevx profile, so an existing profile keeps its URL; one made for an openjevx older than v0.5.11 (port 21118) keeps working while that server stays on 21118.
+- [Memory](/jevx/guides/memory/#how-well-it-works) states its retrieval coverage: on 1042 verified-true claims, v0.12.9's notes carry every number, code and name for all 1042 (1012 before), so `--memory-strict` wrongly fails none of them.
+- The docs site build fails on a broken internal link or `#anchor`.
+
 ## v0.12.9 (2026-10-05)
 
 - Memory retrieval no longer lets a common word fill the notes. A page counts as named in an item when the item has its full name, or the first word of its name when no other page starts with that word: `model` no longer names both `model-card.md` and `model-from-object-storage.md`, which used up the note budget before the section that matched. On 1042 checked claims against a 16-page wiki, the notes now carry every number, code and name in the claim for all 1042 (before: 1012).
