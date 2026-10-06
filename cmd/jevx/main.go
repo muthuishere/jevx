@@ -171,6 +171,9 @@ func cmdInstall(args []string) {
 		}
 	}
 	if !noHook {
+		if cfg.RememberPluginDir() {
+			_ = core.SaveConfig(cfg)
+		}
 		added, removed, err := cfg.InstallHooks(core.SettingsPath())
 		if err != nil {
 			die("%v", err)
@@ -181,7 +184,7 @@ func cmdInstall(args []string) {
 				on++
 			}
 		}
-		if on == 0 {
+		if len(cfg.HookEvents()) == 0 {
 			pr("hooks    none: 0 of %d plugins enabled, so nothing runs on agent events (%d removed in %s). Enabling a plugin adds its hook: jevx plugin list",
 				len(cfg.AllPlugins()), removed, core.SettingsPath())
 			return

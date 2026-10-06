@@ -309,7 +309,13 @@ func syncHooks(action string) {
 	default:
 		return
 	}
-	added, removed, err := core.LoadConfig().InstallHooks(core.SettingsPath())
+	cfg := core.LoadConfig()
+	if cfg.RememberPluginDir() {
+		if err := core.SaveConfig(cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "jevx: %v\n", err)
+		}
+	}
+	added, removed, err := cfg.InstallHooks(core.SettingsPath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "jevx: %v\n", err)
 		return

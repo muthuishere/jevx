@@ -212,6 +212,7 @@ type Config struct {
 	LocalSect  string              `json:"local_context_section,omitempty"` // the section heading, global and folder (default "Jev"; any level)
 	GlobalFile string              `json:"global_context_file,omitempty"`   // global files holding the section (comma list; default below)
 	CacheDir   string              `json:"cache_dir,omitempty"`             // where stored answers live (default ~/.cache/jevx)
+	PluginDirs []string            `json:"plugin_dirs,omitempty"`           // folder .jevx dirs with plugins: their enabled ones keep their hooks
 }
 
 func Home() string { h, _ := os.UserHomeDir(); return h }

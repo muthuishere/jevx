@@ -98,7 +98,7 @@ jevx plugin disable bash-guard
 jevx plugin enable all --act         # every plugin at once (also: disable all)
 ```
 
-`enable NAME --act` skips shadow. Hook entries exist only for events with an enabled plugin: disabling the last one removes its entry. `hook status` shows what is installed and a 24-hour count of scored / would-act / errors. `hook run EVENT` is what the settings entry calls; you never run it yourself.
+`enable NAME --act` skips shadow. Hook entries exist only for events with an enabled plugin: disabling the last one removes its entry. A folder plugin (`--local`) keeps its entry wherever jevx runs next: jevx remembers folders that have plugins, and forgets one when its `.jevx/plugins.json` is gone. `hook status` shows what is installed and a 24-hour count of scored / would-act / errors. `hook run EVENT` is what the settings entry calls; you never run it yourself.
 
 ## Add your own
 

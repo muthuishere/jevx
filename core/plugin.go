@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -444,13 +445,52 @@ func Output(event string, ds []Decision, stopActive bool) string {
 func (c Config) HookEvents() []string {
 	seen := map[string]bool{}
 	var out []string
+	plugins := []Plugin{}
 	for _, p := range c.AllPlugins() {
+		plugins = append(plugins, p)
+	}
+	// folder plugins elsewhere: settings.json is global, so `jevx install` in one folder must not drop another repo's hook
+	for _, d := range c.PluginDirs {
+		m := map[string]Plugin{}
+		if b, err := os.ReadFile(filepath.Join(d, "plugins.json")); err == nil && json.Unmarshal(b, &m) == nil {
+			for _, p := range m {
+				plugins = append(plugins, p)
+			}
+		}
+	}
+	sort.SliceStable(plugins, func(i, j int) bool { return plugins[i].On < plugins[j].On })
+	for _, p := range plugins {
 		if e := p.Event(); e != "" && p.Enabled && !seen[e] {
 			seen[e] = true
 			out = append(out, e)
 		}
 	}
 	return out
+}
+
+// RememberPluginDir records the current folder's .jevx dir when it holds plugins (and forgets recorded dirs whose
+// plugins.json is gone), so their enabled plugins keep their hooks wherever jevx runs next. It reports a change.
+func (c *Config) RememberPluginDir() bool {
+	var keep []string
+	changed := false
+	for _, d := range c.PluginDirs {
+		if _, err := os.Stat(filepath.Join(d, "plugins.json")); err == nil {
+			keep = append(keep, d)
+		} else {
+			changed = true
+		}
+	}
+	if d := LocalDir(); d != "" && len(LocalPlugins()) > 0 {
+		found := false
+		for _, k := range keep {
+			found = found || k == d
+		}
+		if !found {
+			keep, changed = append(keep, d), true
+		}
+	}
+	c.PluginDirs = keep
+	return changed
 }
 
 // TempPath is true for a binary in a temporary folder (a test install, a scratchpad): a hook pointing there breaks every

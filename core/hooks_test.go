@@ -89,3 +89,28 @@ func TestHooksRefuseATemporaryBinary(t *testing.T) {
 		t.Fatal("a refused install must not write settings.json")
 	}
 }
+
+// Regression (found running the plugins guide, 2026-10-06): a plugin enabled in one repo's .jevx/plugins.json must keep
+// its hook when `jevx install` (or an upgrade) runs from another folder.
+func TestAnotherFoldersEnabledPluginKeepsItsHook(t *testing.T) {
+	old := hookSelf
+	hookSelf = func() string { return "/opt/jevx/bin/jevx" }
+	defer func() { hookSelf = old }()
+	repo := filepath.Join(t.TempDir(), ".jevx")
+	writeFile(t, filepath.Join(repo, "plugins.json"), `{"secret-guard":{"on":"PreToolUse:Write|Edit","ask":"secret","deny":"secret >= 0.8","enabled":true}}`)
+	settings := filepath.Join(t.TempDir(), "settings.json")
+	c := Config{Plugins: map[string]Plugin{}, PluginDirs: []string{repo}}
+	if added, _, err := c.InstallHooks(settings); err != nil || added != 1 {
+		t.Fatalf("the recorded folder's enabled plugin needs its PreToolUse entry: added %d err %v", added, err)
+	}
+	if _, removed, _ := c.InstallHooks(settings); removed != 0 {
+		t.Fatal("a second sync from another folder must not remove it")
+	}
+	_ = os.Remove(filepath.Join(repo, "plugins.json"))
+	if !c.RememberPluginDir() || len(c.PluginDirs) != 0 {
+		t.Fatalf("a folder whose plugins.json is gone is forgotten: %v", c.PluginDirs)
+	}
+	if _, removed, _ := c.InstallHooks(settings); removed != 1 {
+		t.Fatal("then its entry is removed")
+	}
+}
