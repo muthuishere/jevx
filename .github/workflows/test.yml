@@ -25,9 +25,12 @@ jobs:
         shell: bash
         # failing tests become annotations, so they show on the run page without opening the log
         run: |
-          go test ./... > test.out 2>&1 && { tail -3 test.out; exit 0; }
+          # Linux also runs the race detector (it needs cgo, which the Linux runner has); the batch test then builds a
+          # race-enabled jevx and runs a parallel batch through it
+          race=; [ "$RUNNER_OS" = Linux ] && race=-race
+          go test $race ./... > test.out 2>&1 && { tail -3 test.out; exit 0; }
           cat test.out
-          grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:|^FAIL' test.out | head -40 | while IFS= read -r l; do
+          grep -E -- '--- FAIL|_test\.go:[0-9]+:|panic:|^FAIL|DATA RACE' test.out | head -40 | while IFS= read -r l; do
             echo "::error title=go test ($RUNNER_OS)::$l"
           done
           exit 1
