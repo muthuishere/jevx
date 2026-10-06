@@ -3,6 +3,12 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.11 (2026-10-06)
+
+- **Hooks run only when you turn a plugin on.** Installing jevx no longer adds Claude Code hook entries for disabled plugins: `settings.json` holds a jevx entry only for an event that has an enabled plugin, and `jevx plugin enable` / `disable` add and remove it. Running `jevx install` (or any installer) removes entries left by earlier versions, and keeps other tools' hooks. Before, every install added four entries that ran jevx on each tool call; if that binary later disappeared (a test install in a temporary folder), every tool call failed.
+- jevx refuses to write hooks for a binary in a temporary folder, and on macOS and Linux a hook entry does nothing if its binary is gone.
+- The release script always allows three vault values that are also public strings here (`DB_SSLMODE`, `SMTP_HOST`, `DEEMWAR_REGISTRY_USER`).
+
 ## v0.12.10 (2026-10-06)
 
 - The local-endpoint example in the agent skill, README and docs is openjevx on its default port since openjevx v0.5.11: `jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx`. jevx ships no openjevx profile, so an existing profile keeps its URL; one made for an openjevx older than v0.5.11 (port 21118) keeps working while that server stays on 21118.
