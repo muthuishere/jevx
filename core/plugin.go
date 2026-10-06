@@ -439,12 +439,13 @@ func Output(event string, ds []Decision, stopActive bool) string {
 
 // ---------------------------------------------------------------- settings.json entries
 
-// HookEvents are the agent events that have at least one configured plugin: one settings.json entry each.
+// HookEvents are the agent events that have at least one ENABLED plugin: one settings.json entry each. With nothing
+// enabled there are no entries at all, so a disabled jevx never runs on an agent event (the owner's rule).
 func (c Config) HookEvents() []string {
 	seen := map[string]bool{}
 	var out []string
 	for _, p := range c.AllPlugins() {
-		if e := p.Event(); e != "" && !seen[e] {
+		if e := p.Event(); e != "" && p.Enabled && !seen[e] {
 			seen[e] = true
 			out = append(out, e)
 		}
@@ -452,8 +453,41 @@ func (c Config) HookEvents() []string {
 	return out
 }
 
-// InstallHooks adds one entry per event to the agent's settings.json (idempotent) and removes ours for events that no
-// longer have a plugin. Installed is not enabled: `jevx hook run EVENT` does nothing unless a plugin is enabled.
+// TempPath is true for a binary in a temporary folder (a test install, a scratchpad): a hook pointing there breaks every
+// agent event once the folder is cleaned, so InstallHooks refuses it.
+func TempPath(p string) bool {
+	p = filepath.ToSlash(filepath.Clean(p))
+	roots := []string{os.TempDir(), "/tmp", "/private/tmp", "/var/tmp", "/private/var/folders", "/var/folders"}
+	for _, r := range roots {
+		r = filepath.ToSlash(filepath.Clean(r))
+		if r != "." && r != "/" && (p == r || strings.HasPrefix(p, r+"/")) {
+			return true
+		}
+	}
+	return strings.Contains(p, "/scratchpad/")
+}
+
+// hookSelf is the binary the hook entries run (a variable so tests can point it at a lasting path).
+var hookSelf = func() string {
+	self, _ := os.Executable()
+	if r, err := filepath.EvalSymlinks(self); err == nil {
+		self = r
+	}
+	return self
+}
+
+// hookCommand is the settings.json command for an event. On macOS and Linux it is a no-op when the binary is gone, so an
+// uninstalled or moved jevx never makes every tool call fail.
+func hookCommand(self, event string) string {
+	if runtime.GOOS == "windows" {
+		return `"` + self + `" hook run ` + event
+	}
+	return `[ -x "` + self + `" ] || exit 0; "` + self + `" hook run ` + event
+}
+
+// InstallHooks makes our settings.json entries match the ENABLED plugins (idempotent): one per event that has an
+// enabled plugin, ours removed for every other event. Nothing enabled means no entries. It refuses a binary in a
+// temporary folder.
 func (c Config) InstallHooks(settings string) (added, removed int, err error) {
 	m, err := readJSON(settings)
 	if err != nil {
@@ -468,8 +502,11 @@ func (c Config) InstallHooks(settings string) (added, removed int, err error) {
 	for _, e := range c.HookEvents() {
 		want[e] = true
 	}
-	self, _ := os.Executable()
-	cmd := func(e string) string { return `"` + self + `" hook run ` + e }
+	self := hookSelf()
+	if len(want) > 0 && TempPath(self) {
+		return 0, 0, fmt.Errorf("not adding hooks that run %s: it is in a temporary folder, so every agent event would fail once it is cleaned. Install jevx to a lasting folder (e.g. ~/.local/bin) and run `jevx install --hooks` from there", self)
+	}
+	cmd := func(e string) string { return hookCommand(self, e) }
 	for e := range want {
 		list, _ := hooks[e].([]any)
 		var keep []any

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Downloads the jevx binary for this platform from the GitHub release that matches this package's version (so every
 // install is counted by GitHub Releases), then runs `jevx install` to put the agent skill in place and register the
-// hook entries (plugins stay disabled). JEVX_NO_HOOK=1: skills only. JEVX_SKIP_SETUP=1: binary only.
+// hook entries only for enabled plugins (none by default). JEVX_NO_HOOK=1: skills only. JEVX_SKIP_SETUP=1: binary only.
 'use strict';
 const fs = require('fs');
 const path = require('path');

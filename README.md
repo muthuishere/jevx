@@ -51,7 +51,7 @@ go install github.com/muthuishere/jevx/cmd/jevx@latest                  # from s
 
 Every channel installs the binary from [the latest release](https://github.com/muthuishere/jevx/releases/latest)
 (macOS / Linux / Windows, amd64 + arm64), then runs `jevx install`: the skill goes into `~/.claude/skills`,
-`~/.agents/skills` (and `~/.codex/skills` if present), and hook entries are registered with every plugin **off**.
+`~/.agents/skills` (and `~/.codex/skills` if present), and no hook runs until you enable a plugin: `jevx plugin enable NAME` adds its Claude Code hook entry, disabling removes it.
 `JEVX_NO_HOOK=1` installs the skills only. Later: `jevx install|uninstall [--skills] [--hooks]`.
 
 Set your key and you are done: jevx uses hosted Jev by default, with no config file. Create a key in the

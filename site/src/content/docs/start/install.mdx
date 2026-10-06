@@ -38,7 +38,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 | --- | --- |
 | `JEVX_VERSION=v0.9.0` | pin a release instead of latest (shell installers) |
 | `JEVX_BIN=DIR` | install the binary there (default `~/.local/bin`; Windows `%LOCALAPPDATA%\Programs\jevx`) |
-| `JEVX_NO_HOOK=1` | skills only, no Claude Code hook entries (all installers, npm included) |
+| `JEVX_NO_HOOK=1` | skills only: the installer does not touch Claude Code's settings at all (all installers, npm included) |
 
 If a direct download fails and `gh` is installed, the shell script falls back to `gh release download`. It also tells you if the directory is not on your PATH.
 
@@ -58,7 +58,7 @@ Usage of install:
 ```
 
 - `--skills` writes `SKILL.md` into `~/.claude/skills/jevx`, `~/.agents/skills/jevx`, and `~/.codex/skills/jevx` if `~/.codex` exists.
-- `--hooks` adds one entry per plugin event to Claude Code's `settings.json`, each calling `jevx hook run EVENT`. The plugins stay disabled, so the entries are no-ops until `plugin enable`.
+- `--hooks` makes Claude Code's `settings.json` match your **enabled** plugins: one entry per event that has one, each calling `jevx hook run EVENT`, and none of jevx's when nothing is enabled (old entries are removed; other tools' hooks are kept). `plugin enable` / `disable` do this for you. On macOS and Linux the entry does nothing if the binary is gone, and jevx refuses to write hooks for a binary in a temporary folder.
 - Neither flag: both. Re-running is idempotent.
 
 `jevx uninstall` takes the same flags and removes exactly what was written, leaving other skills and hooks alone.

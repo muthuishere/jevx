@@ -1,6 +1,6 @@
 #!/bin/sh
 # jevx installer (macOS / Linux): downloads the release binary, then `jevx install` puts the agent skill in
-# ~/.claude/skills, ~/.agents/skills (and ~/.codex/skills if present) and adds the Claude Code hook template (disabled).
+# ~/.claude/skills, ~/.agents/skills (and ~/.codex/skills if present) and syncs Claude Code hooks with enabled plugins (none by default).
 #   curl -fsSL https://muthuishere.github.io/jevx/install.sh | sh
 #   JEVX_VERSION=v0.1.0 JEVX_BIN=~/.local/bin sh install.sh     # pin a version / choose the dir
 #   JEVX_NO_HOOK=1 ...                                            # skills only

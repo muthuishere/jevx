@@ -91,15 +91,14 @@ Here the deny condition fired because `destroys 0.89 >= 0.8` and `irreversible 0
 ## Turn one on
 
 ```bash title="Terminal"
-jevx install --hooks                 # one settings entry per event in Claude Code's settings
-jevx plugin enable bash-guard        # shadow: logs only
+jevx plugin enable bash-guard        # shadow: logs only; adds its hook entry to Claude Code's settings
 jevx plugin log bash-guard 20        # what it would have decided, with the answers
 jevx plugin mode bash-guard act      # deny / ask for real
 jevx plugin disable bash-guard
 jevx plugin enable all --act         # every plugin at once (also: disable all)
 ```
 
-`enable NAME --act` skips shadow. `hook status` shows what is installed and a 24-hour count of scored / would-act / errors. `hook run EVENT` is what the settings entry calls; you never run it yourself.
+`enable NAME --act` skips shadow. Hook entries exist only for events with an enabled plugin: disabling the last one removes its entry. `hook status` shows what is installed and a 24-hour count of scored / would-act / errors. `hook run EVENT` is what the settings entry calls; you never run it yourself.
 
 ## Add your own
 
@@ -108,7 +107,7 @@ jevx question add secret --noul "Does this file content contain a credential, to
 jevx plugin add secret-guard --desc "Refuse writing a secret into a file" \
   --on "PreToolUse:Write|Edit" --ask secret --deny "secret >= 0.8" --local
 jevx plugin test secret-guard "aws_access_key_id = AKIAIOSFODNN7EXAMPLE"
-jevx install --hooks && jevx plugin enable secret-guard
+jevx plugin enable secret-guard      # adds the PreToolUse entry
 ```
 
 `test` builds its sample for the tool the plugin watches (here a `Write` with that content). Against hosted Jev (2026-10-04) it denies AWS's documentation example key (`secret` 0.95) and a `password: ...` line (0.96), and allows `LOG_LEVEL=debug` (0.03). Plugins redact secrets before a hosted call, so the model sees `[SECRET]` in place of the value; that marker is enough for it to answer yes.

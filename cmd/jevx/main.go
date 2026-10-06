@@ -181,6 +181,11 @@ func cmdInstall(args []string) {
 				on++
 			}
 		}
+		if on == 0 {
+			pr("hooks    none: 0 of %d plugins enabled, so nothing runs on agent events (%d removed in %s). Enabling a plugin adds its hook: jevx plugin list",
+				len(cfg.AllPlugins()), removed, core.SettingsPath())
+			return
+		}
 		pr("hooks    %s: %d added, %d removed in %s; %d of %d plugins enabled (jevx plugin list)",
 			strings.Join(cfg.HookEvents(), ", "), added, removed, core.SettingsPath(), on, len(cfg.AllPlugins()))
 	}

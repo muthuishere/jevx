@@ -17,7 +17,7 @@ curl -fsSL https://muthuishere.github.io/jevx/install.sh | sh
 curl -fsSLo install.cmd https://muthuishere.github.io/jevx/install.cmd && install.cmd
 ```
 
-Each one puts the `jevx` binary on your PATH, copies the agent skill into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills` (if that folder exists), and adds the Claude Code hook entries, which stay disabled. `JEVX_NO_HOOK=1` installs the skills only. Details in [Install](/jevx/start/install/).
+Each one puts the `jevx` binary on your PATH, copies the agent skill into `~/.claude/skills`, `~/.agents/skills` and `~/.codex/skills` (if that folder exists), and writes no Claude Code hook: nothing runs on agent events until you enable a plugin, which adds its own entry. `JEVX_NO_HOOK=1` skips the hook step entirely. Details in [Install](/jevx/start/install/).
 
 ## 2. Set your key
 

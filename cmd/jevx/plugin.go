@@ -74,6 +74,7 @@ func cmdPlugin(args []string) {
 		}
 		pr("saved %s", core.ConfigPath())
 	}
+	defer syncHooks(args[0])
 	switch args[0] {
 	case "show":
 		pr("%s", jsonPretty(need()))
@@ -103,9 +104,6 @@ func cmdPlugin(args []string) {
 				die("%v", err)
 			}
 			pr("%d plugins %sd", len(all), args[0])
-			if on && len(core.InstalledEvents(core.SettingsPath())) == 0 {
-				pr("note: no hooks in %s yet: run `jevx install --hooks`", core.SettingsPath())
-			}
 			return
 		}
 		p := need()
@@ -121,9 +119,6 @@ func cmdPlugin(args []string) {
 				mode = "shadow"
 			}
 			pr("%s enabled, mode %s%s", name, mode, map[bool]string{true: " (logs only; `jevx plugin mode " + name + " act` to let it act)", false: ""}[mode == "shadow"])
-			if !contains(core.InstalledEvents(core.SettingsPath()), p.Event()) {
-				pr("note: no %s hook in %s yet: run `jevx install --hooks`", p.Event(), core.SettingsPath())
-			}
 		}
 	case "mode":
 		p := need()
@@ -304,4 +299,22 @@ func jsonPretty(v any) string {
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
 	return strings.TrimRight(b.String(), "\n")
+}
+
+// syncHooks keeps settings.json in step with the enabled plugins after a plugin change: entries exist only for events
+// with an enabled plugin, so enabling is the opt-in and disabling the last one removes them.
+func syncHooks(action string) {
+	switch action {
+	case "enable", "disable", "add", "remove", "rm":
+	default:
+		return
+	}
+	added, removed, err := core.LoadConfig().InstallHooks(core.SettingsPath())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "jevx: %v\n", err)
+		return
+	}
+	if added+removed > 0 {
+		pr("hooks    %d added, %d removed in %s", added, removed, core.SettingsPath())
+	}
 }

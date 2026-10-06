@@ -200,9 +200,9 @@ injection, complexity, kind), then one of `--deny` / `--warn` / `--block` / `--c
 `name >= 0.8 && other < 0.5 || kind == ops`. `--say TEXT` is what the agent is told (`{{name}}` = that answer).
 `--exec CMD` hands the event to any command instead (it gets `{event, payload, state, answers}` on stdin and prints the
 agent's decision JSON), so a tool another project built can be plugged in without a jevx change. `--local` saves it
-in this repo's `.jevx/plugins.json`. After adding: `jevx install --hooks`, then `plugin enable`.
+in this repo's `.jevx/plugins.json`. After adding: `plugin enable` (it writes the hook entry; only with the user's go-ahead).
 
-Plugins follow Claude Code's hook protocol and `install --hooks` writes Claude Code's settings. In other agents the
+Plugins follow Claude Code's hook protocol and enabling one writes Claude Code's settings. In other agents the
 skill works but plugins do not run yet.
 
 ## Setup (once)
