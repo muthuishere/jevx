@@ -40,11 +40,7 @@ func cmdMemory(args []string) {
 					stale++
 				}
 			}
-			line := fmt.Sprintf("%-16s %4d sections  %2d stale  %s  indexed %s", n, len(m.Sections), stale, m.Dir, m.Indexed.Format("2006-01-02 15:04"))
-			if len(changed) > 0 || len(added) > 0 {
-				line += fmt.Sprintf("  (%d changed, %d new since index: jevx memory index %s)", len(changed), len(added), n)
-			}
-			pr("%s", line)
+			pr("%s", memListLine(n, len(m.Sections), stale, m.Dir, m.Indexed.Format("2006-01-02 15:04"), len(changed), len(added)))
 		}
 	case "add":
 		fs := flag.NewFlagSet("memory add", flag.ExitOnError)
@@ -149,6 +145,15 @@ func indexAndSave(m *core.Memory) {
 }
 
 // printUnverifiable warns about cites that could not be read at index time: check cannot vouch for those pages.
+// memListLine is one row of `jevx memory list` (the docs quote it; docs_test re-renders their example with it).
+func memListLine(name string, sections, stale int, dir, indexed string, changed, added int) string {
+	line := fmt.Sprintf("%-16s %4d sections  %2d stale  %s  indexed %s", name, sections, stale, dir, indexed)
+	if changed > 0 || added > 0 {
+		line += fmt.Sprintf("  (%d changed, %d new since index: jevx memory index %s)", changed, added, name)
+	}
+	return line
+}
+
 // warnDrift leaves pages edited since the index out of retrieval and says so on stderr, so an out-of-date index is
 // never served silently.
 func warnDrift(m *core.Memory) {

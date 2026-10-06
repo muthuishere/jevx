@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -84,5 +85,34 @@ func TestDocsHelpBlocksMatchBinary(t *testing.T) {
 	}
 	if n == 0 {
 		t.Fatal("found no -h blocks in the docs: the pattern is broken")
+	}
+}
+
+// TestDocsMemoryListMatchesFormat: every row quoted under `$ jevx memory list` must be exactly what memListLine prints
+// for its own fields, so a hand-typed example cannot drift from the real columns.
+func TestDocsMemoryListMatchesFormat(t *testing.T) {
+	row := regexp.MustCompile(`^(\S+)\s+(\d+) sections\s+(\d+) stale  (\S+)  indexed (\S+ \S+)(?:  \((\d+) changed, (\d+) new since index: jevx memory index \S+\))?$`)
+	block := regexp.MustCompile("(?s)\\$ jevx memory list\\r?\\n(.*?)\\r?\\n```")
+	files, _ := filepath.Glob("../../site/src/content/docs/*/*.md*")
+	n := 0
+	for _, f := range files {
+		b, _ := os.ReadFile(f)
+		for _, m := range block.FindAllStringSubmatch(string(b), -1) {
+			for _, l := range strings.Split(strings.ReplaceAll(m[1], "\r\n", "\n"), "\n") {
+				n++
+				p := row.FindStringSubmatch(l)
+				if p == nil {
+					t.Errorf("%s: not a memory list row: %q", f, l)
+					continue
+				}
+				num := func(s string) int { v, _ := strconv.Atoi(s); return v }
+				if want := memListLine(p[1], num(p[2]), num(p[3]), p[4], p[5], num(p[6]), num(p[7])); want != l {
+					t.Errorf("%s: memory list row differs from the binary's format:\n got  %q\n want %q", f, l, want)
+				}
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("found no `$ jevx memory list` rows in the docs: the pattern is broken")
 	}
 }

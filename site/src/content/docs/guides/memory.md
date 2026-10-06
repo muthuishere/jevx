@@ -41,7 +41,7 @@ Pages themselves are checked on every use: `list`, `show` and `ask --memory` has
 
 ```console
 $ jevx memory list
-jevwiki   259 sections   9 stale  ~/wiki  indexed 2026-10-04 10:06  (9 changed, 1 new since index: jevx memory index jevwiki)
+jevwiki           259 sections   9 stale  ~/wiki  indexed 2026-10-04 10:06  (9 changed, 1 new since index: jevx memory index jevwiki)
 ```
 
 Run `jevx memory index NAME` after you edit pages. jevx never re-indexes on its own, because that would re-baseline the cite hashes `check` compares against.
