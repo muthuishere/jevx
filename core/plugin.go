@@ -517,7 +517,10 @@ var hookSelf = func() string {
 }
 
 // hookCommand is the settings.json command for an event. On macOS and Linux it is a no-op when the binary is gone, so an
-// uninstalled or moved jevx never makes every tool call fail.
+// uninstalled or moved jevx never makes every tool call fail. Windows keeps the plain command on purpose: Claude Code
+// there runs commands through Git Bash or PowerShell depending on the install, and a POSIX `[ -x ]` guard breaks under
+// PowerShell. A missing binary there is a non-blocking hook error (any exit code but 2), and the entry exists only
+// while a plugin is enabled.
 func hookCommand(self, event string) string {
 	if runtime.GOOS == "windows" {
 		return `"` + self + `" hook run ` + event
