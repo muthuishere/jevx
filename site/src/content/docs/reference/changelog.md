@@ -3,6 +3,11 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.13 (2026-10-07)
+
+- A plugin enabled in one repo (`jevx plugin add ... --local`) keeps its Claude Code hook when `jevx install`, an installer or an upgrade runs from another folder. In v0.12.12 that removed the repo's hook. jevx now remembers folders that have plugins and forgets one when its `.jevx/plugins.json` is gone.
+- Release checks wait for npm to serve a new version before testing the npm install.
+
 ## v0.12.12 (2026-10-06)
 
 - **Hooks run only when you turn a plugin on.** Installing jevx no longer adds Claude Code hook entries for disabled plugins: `settings.json` holds a jevx entry only for an event that has an enabled plugin, and `jevx plugin enable` / `disable` add and remove it. Running `jevx install` (or any installer) removes entries left by earlier versions, and keeps other tools' hooks. Before, every install added four entries that ran jevx on each tool call; if that binary later disappeared (a test install in a temporary folder), every tool call failed.
