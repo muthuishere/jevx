@@ -3,8 +3,8 @@
 //	jevx ask QUESTION [--context TEXT|-] [--option KEY=DESC ... | --true DESC --false DESC] [--profile P] [--json]
 //	jevx query --state TEXT|JSON|@file|- --noul NAME=INSTRUCTIONS ... [--choice NAME="INSTR|k=desc;k2=desc"] [--score NAME="INSTR|L0;L1;L2"] [--raw]
 //	jevx judge --request TEXT --proposal TEXT [--action LINE ...] [--profile P] [--json]
-//	jevx install [--no-skill] [--no-hook]     skill into Claude Code + Codex, Stop-hook template (inert until enabled)
-//	jevx uninstall                            remove the skill links and the hook template
+//	jevx install [--no-skill] [--no-hook]     skill into Claude Code + Codex; hook entries only for enabled plugins
+//	jevx uninstall                            remove the skill and jevx's hook entries
 //	jevx hook enable|disable stop | mode shadow|block | profile NAME | status | review [N] | run stop
 //	jevx config show | set-endpoint PROFILE URL [MODEL] | default PROFILE
 //	jevx profile list | add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE] | use NAME | remove NAME | show NAME
@@ -105,7 +105,7 @@ func cmdJudge(args []string) {
 		ans["accepts"].P(), ans["wanted_more"].P(), r.Choice, rp, rc, sv, name)
 }
 
-// ------------------------------------------------------------------ install: skill + hook template
+// ------------------------------------------------------------------ install: skill + hooks
 
 // skillDirs are the global skill dirs: Claude Code (~/.claude, $CLAUDE_CONFIG_DIR) and the cross-agent ~/.agents are
 // created if missing; Codex only if ~/.codex exists.
@@ -197,8 +197,8 @@ func cmdInstall(args []string) {
 // parts reads --skills / --hooks: both when neither is given. --no-skill / --no-hook still work.
 func parts(cmd string, args []string) (skills, hooks bool) {
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
-	s, h := fs.Bool("skills", false, "only the agent skill"), fs.Bool("hooks", false, "only the hook template")
-	ns, nh := fs.Bool("no-skill", false, "skip the agent skill"), fs.Bool("no-hook", false, "skip the hook template")
+	s, h := fs.Bool("skills", false, "only the agent skill"), fs.Bool("hooks", false, "only the hooks: sync Claude Code entries with enabled plugins")
+	ns, nh := fs.Bool("no-skill", false, "skip the agent skill"), fs.Bool("no-hook", false, "skip the hooks")
 	_ = fs.Parse(args)
 	skills, hooks = *s || !*h, *h || !*s
 	return skills && !*ns, hooks && !*nh
