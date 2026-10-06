@@ -17,6 +17,17 @@ echo "ok version: $got"
 [ -f "$HOME/.claude/skills/jevx/SKILL.md" ] || { echo "FAIL skill: $HOME/.claude/skills/jevx/SKILL.md missing"; exit 1; }
 echo "ok skill: ~/.claude/skills/jevx/SKILL.md"
 
+# The owner's rule: a default install (no plugin enabled) leaves no jevx hook in Claude Code's settings.
+if [ -z "${JEVX_NO_HOOK:-}" ]; then
+  settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+  n=$("$py" -c 'import json,sys,os
+p=sys.argv[1]
+h=json.load(open(p)).get("hooks",{}) if os.path.exists(p) else {}
+print(sum(1 for v in h.values() for e in v for x in e.get("hooks",[]) if " hook run " in x.get("command","") and ("jevx" in x.get("command","") or "jevcli" in x.get("command",""))))' "$settings")
+  [ "$n" = 0 ] || { echo "FAIL hooks: a default install left $n jevx hook entr(y/ies) in $settings"; exit 1; }
+  echo "ok hooks: a default install adds no jevx hook"
+fi
+
 export JEVX_CONFIG="${RUNNER_TEMP:-$(mktemp -d)}/jevx-smoke.json"
 echo '{}' > "$JEVX_CONFIG"
 jevx profile add stub http://127.0.0.1:21999/v1/systemone --model stub >/dev/null

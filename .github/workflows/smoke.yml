@@ -33,7 +33,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       VER: ${{ inputs.version || github.event.workflow_run.head_branch }} # empty on push: the latest release
-      JEVX_NO_HOOK: "1"
     steps:
       - uses: actions/checkout@v4
         with:
