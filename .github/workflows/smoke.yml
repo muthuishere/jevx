@@ -73,7 +73,12 @@ jobs:
         if: matrix.channel == 'npm'
         shell: bash
         run: |
-          for i in 1 2 3 4 5 6; do npm view "@muthuishere/jevx@${VER#v}" version >/dev/null 2>&1 && break; sleep 20; done
+          # wait (up to 8 min) until the registry serves this version's tarball, not only lists it: on v0.12.11 the
+          # registry dated the version 2 min after `npm publish` returned and the old 2-min wait failed two jobs
+          for i in $(seq 1 24); do
+            url=$(npm view "@muthuishere/jevx@${VER#v}" dist.tarball 2>/dev/null) && [ -n "$url" ] && curl -fsI "$url" >/dev/null && break
+            echo "npm: ${VER#v} not served yet ($i/24)"; sleep 20
+          done
           # right after a publish the registry can list a version before every mirror serves it: retry, and put npm's
           # own error on the run page if it still fails
           for i in 1 2 3 4 5; do
