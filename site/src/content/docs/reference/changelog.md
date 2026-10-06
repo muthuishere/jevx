@@ -3,6 +3,10 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.11 (2026-10-06)
+
+- release.sh: DB_SSLMODE, SMTP_HOST and DEEMWAR_REGISTRY_USER are always allowed by the secret check
+
 ## v0.12.10 (2026-10-06)
 
 - The local-endpoint example in the agent skill, README and docs is openjevx on its default port since openjevx v0.5.11: `jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx`. jevx ships no openjevx profile, so an existing profile keeps its URL; one made for an openjevx older than v0.5.11 (port 21118) keeps working while that server stays on 21118.
