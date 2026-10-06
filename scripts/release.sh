@@ -8,7 +8,9 @@
 # Environment (all optional):
 #   REMOTE               where to push (default git@github.com:muthuishere/jevx.git)
 #   SITE_URL             the docs site to verify (default https://muthuishere.github.io/jevx)
-#   SEAL_ALLOW           comma list of secret names `sec seal --check` may report as false positives
+#   SEAL_ALLOW           extra comma list of secret names `sec seal --check` may report as false positives; always
+#                        allowed: DB_SSLMODE, SMTP_HOST, DEEMWAR_REGISTRY_USER (vault values that are also public strings
+#                        in this repo: a TLS mode, a mail host, the public registry/GitHub username)
 #   INSTALLER_MIRRORS    space-separated site URLs that serve copies of install.sh / install.cmd; each copy must be
 #                        byte-identical to the one on SITE_URL after the release
 #   DRY_RUN=1            run the checks and print the next tag, change nothing
@@ -47,7 +49,7 @@ if command -v sec >/dev/null; then
     out=$(sec seal "$f" --check 2>&1) && continue
     names=$(sed -n 's/.*live secret(s): //p' <<<"$out" | tr -d ' ')
     for n in ${names//,/ }; do
-      [[ ",${SEAL_ALLOW:-}," == *",$n,"* ]] || { echo "secret check: $f holds $n"; bad=1; }
+      [[ ",DB_SSLMODE,SMTP_HOST,DEEMWAR_REGISTRY_USER,${SEAL_ALLOW:-}," == *",$n,"* ]] || { echo "secret check: $f holds $n"; bad=1; }
     done
   done
   [ $bad = 0 ] || die "secret check failed (false positive? add the name to SEAL_ALLOW)"
