@@ -148,3 +148,21 @@ func TestRedactionNamesTheCategory(t *testing.T) {
 		t.Errorf("pre-existing marker counted: %v", k)
 	}
 }
+
+// Redactions reports what a call would scrub: something for a hosted endpoint, nothing for a local one (the user's own
+// machine sees the raw text). Unknown hosts fail safe as hosted.
+func TestRedactionsHostedOnly(t *testing.T) {
+	state := "db password=hunter2hunter2 for ops@example.com"
+	qs := map[string]any{"x": NoulQ(Profile{}, "Is this a leak?")}
+	if k := Redactions(Profile{URL: "https://api.example.com/v1/systemone"}, state, qs); len(k) == 0 {
+		t.Fatal("a hosted endpoint must redact the password and the email")
+	}
+	for _, local := range []string{"http://127.0.0.1:21160/v1/systemone", "http://localhost:21160/v1/systemone"} {
+		if k := Redactions(Profile{URL: local}, state, qs); len(k) != 0 {
+			t.Fatalf("%s is local, nothing is redacted: %v", local, k)
+		}
+	}
+	if k := Redactions(Profile{URL: "not a url"}, state, qs); len(k) == 0 {
+		t.Fatal("an unparsable URL fails safe: treated as hosted")
+	}
+}

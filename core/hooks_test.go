@@ -114,3 +114,42 @@ func TestAnotherFoldersEnabledPluginKeepsItsHook(t *testing.T) {
 		t.Fatal("then its entry is removed")
 	}
 }
+
+// RemoveHooks is `jevx uninstall --hooks`, the cleanup given to the owner after the 2026-10-06 incident: it must remove
+// every jevx entry shape (plain, guarded, the old jevcli name), keep every other hook and setting, and back up first.
+func TestRemoveHooksTakesOnlyJevxEntriesAndBacksUp(t *testing.T) {
+	dir := t.TempDir()
+	settings := filepath.Join(dir, "settings.json")
+	orig := `{"model":"opus","hooks":{
+		"PreToolUse":[
+			{"hooks":[{"type":"command","command":"\"/private/var/folders/x/jevx\" hook run PreToolUse"}]},
+			{"matcher":"Bash","hooks":[{"type":"command","command":"other-guard.sh"}]},
+			{"hooks":[{"type":"command","command":"[ -x \"/opt/jevx\" ] || exit 0; \"/opt/jevx\" hook run PreToolUse"}]}],
+		"Stop":[{"hooks":[{"type":"command","command":"/usr/local/bin/jevcli hook run Stop"}]}],
+		"SessionStart":[{"hooks":[{"type":"command","command":"echo hello"}]}]}}`
+	writeFile(t, settings, orig)
+	n, err := RemoveHooks(settings)
+	if err != nil || n != 3 {
+		t.Fatalf("removed %d err %v, want 3", n, err)
+	}
+	b, _ := os.ReadFile(settings)
+	got := string(b)
+	for _, keep := range []string{"other-guard.sh", `"matcher": "Bash"`, "echo hello", `"model": "opus"`} {
+		if !strings.Contains(got, keep) {
+			t.Errorf("lost %s:\n%s", keep, got)
+		}
+	}
+	if strings.Contains(got, "hook run") || strings.Contains(got, `"Stop"`) {
+		t.Errorf("a jevx entry or an emptied event is left:\n%s", got)
+	}
+	baks, _ := filepath.Glob(settings + ".bak-jevx-*")
+	if len(baks) != 1 {
+		t.Fatalf("want one backup, got %v", baks)
+	}
+	if bb, _ := os.ReadFile(baks[0]); string(bb) != orig {
+		t.Fatal("the backup must be the original file")
+	}
+	if n, _ := RemoveHooks(settings); n != 0 {
+		t.Fatal("a second run removes nothing")
+	}
+}
