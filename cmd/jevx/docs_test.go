@@ -116,3 +116,29 @@ func TestDocsMemoryListMatchesFormat(t *testing.T) {
 		t.Fatal("found no `$ jevx memory list` rows in the docs: the pattern is broken")
 	}
 }
+
+// TestDocsScenarioCountMatches: the landing page's "N real situations" must equal the scenarios on the Scenarios
+// page (### headings under "## Scenarios"), so adding or removing one cannot leave the number stale.
+func TestDocsScenarioCountMatches(t *testing.T) {
+	b, err := os.ReadFile("../../site/src/content/docs/guides/scenarios.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, in := 0, false
+	for _, l := range strings.Split(string(b), "\n") {
+		switch {
+		case strings.HasPrefix(l, "## "):
+			in = strings.TrimSpace(l) == "## Scenarios"
+		case in && strings.HasPrefix(l, "### "):
+			n++
+		}
+	}
+	idx, _ := os.ReadFile("../../site/src/content/docs/index.mdx")
+	m := regexp.MustCompile(`(\d+) real situations`).FindStringSubmatch(string(idx))
+	if m == nil || n == 0 {
+		t.Fatalf("pattern broken: %d scenarios, landing match %v", n, m)
+	}
+	if got, _ := strconv.Atoi(m[1]); got != n {
+		t.Errorf("landing page says %d real situations; the Scenarios page has %d", got, n)
+	}
+}
