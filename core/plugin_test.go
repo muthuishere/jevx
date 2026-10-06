@@ -1,6 +1,9 @@
 package core
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -59,5 +62,58 @@ func TestPluginMatchAndState(t *testing.T) {
 	}
 	if got := fill("kind={{kind}} p={{d}}", map[string]Answer{"kind": {Type: "choice", Choice: "ops"}, "d": {Type: "noul", Noul: fp(0.5)}}); got != "kind=ops p=0.50" {
 		t.Errorf("fill: %q", got)
+	}
+}
+
+// Run is the safety path behind bash-guard: answers -> deny / warn / allow, deny before warn, and fail OPEN (allow,
+// error recorded) when the endpoint fails, so a broken endpoint never blocks the user's work.
+func TestRunBashGuardDecisions(t *testing.T) {
+	setHome(t, t.TempDir())
+	var probs map[string]float64
+	fail := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if fail {
+			http.Error(w, "boom", 500)
+			return
+		}
+		var req struct {
+			Questions map[string]json.RawMessage `json:"questions"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		ans := map[string]any{}
+		for k := range req.Questions {
+			ans[k] = map[string]any{"type": "noul", "noul": probs[k], "confidence": 0.9}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"model": "stub", "answers": ans})
+	}))
+	defer srv.Close()
+	c := Config{Default: "stub", Profiles: map[string]Profile{"stub": {URL: srv.URL + "/v1/systemone", Model: "stub"}},
+		Plugins: map[string]Plugin{}}
+	zero := 0
+	c.Defaults.Retries = &zero
+	guard := Shipped["bash-guard"]
+	pay := Payload{"tool_name": "Bash", "tool_input": map[string]any{"command": "rm -rf /srv/data"}}
+	for _, tc := range []struct {
+		name  string
+		probs map[string]float64
+		want  string
+	}{
+		{"destructive and irreversible", map[string]float64{"destroys": 0.91, "irreversible": 0.87, "remote": 0.9}, "deny"},
+		{"destructive but recoverable", map[string]float64{"destroys": 0.6, "irreversible": 0.2, "remote": 0.1}, "warn"},
+		{"harmless", map[string]float64{"destroys": 0.05, "irreversible": 0.05, "remote": 0.05}, "allow"},
+	} {
+		probs = tc.probs
+		d, rec := c.Run("bash-guard", guard, "PreToolUse", pay)
+		if d.Action != tc.want || rec["error"] != nil {
+			t.Errorf("%s: got %q (err %v), want %q", tc.name, d.Action, rec["error"], tc.want)
+		}
+		if tc.want == "deny" && !strings.Contains(d.Reason, "destroys") {
+			t.Errorf("a deny says why: %q", d.Reason)
+		}
+	}
+	fail = true
+	d, rec := c.Run("bash-guard", guard, "PreToolUse", pay)
+	if d.Action != "allow" || rec["error"] == nil {
+		t.Fatalf("endpoint failure must fail open with the error recorded: %q %v", d.Action, rec["error"])
 	}
 }
