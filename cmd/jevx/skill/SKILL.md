@@ -199,7 +199,7 @@ Fields: `--on EVENT[:Tool regex]`, `--ask q1,q2` (saved or built-in: accepts, wa
 injection, complexity, kind), then one of `--deny` / `--warn` / `--block` / `--context "COND"` where COND is
 `name >= 0.8 && other < 0.5 || kind == ops`. `--say TEXT` is what the agent is told (`{{name}}` = that answer).
 `--exec CMD` hands the event to any command instead (it gets `{event, payload, state, answers}` on stdin and prints the
-agent's decision JSON), so a tool another project built can be plugged in without a jevx change. `--local` saves it
+agent's decision JSON within 15 s; a failing or slower one is logged and the call goes ahead), so a tool another project built can be plugged in without a jevx change. `--local` saves it
 in this repo's `.jevx/plugins.json`. After adding: `plugin enable` (it writes the hook entry; only with the user's go-ahead).
 
 Plugins follow Claude Code's hook protocol and enabling one writes Claude Code's settings. In other agents the

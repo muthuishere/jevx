@@ -117,7 +117,7 @@ $ jevx plugin add
 jevx: usage: jevx plugin add NAME --on EVENT[:Tool] --ask q1,q2 --deny|--warn|--block|--context "COND" [--say TEXT] [--exec CMD] [--desc TEXT] [--profile P] [--local]
 ```
 
-`--local` stores it in the repo's `.jevx/plugins.json`, which overrides a global plugin of the same name and can be committed. `--enable` on `add` enables it at once (shadow). `--exec CMD` plugs in a tool from another project without a jevx change.
+`--local` stores it in the repo's `.jevx/plugins.json`, which overrides a global plugin of the same name and can be committed. `--enable` on `add` enables it at once (shadow). `--exec CMD` plugs in a tool from another project without a jevx change: the command gets `{event, payload, state, answers}` on stdin and prints the agent's decision JSON. It has 15 seconds; a command that fails or takes longer is logged and the tool call goes ahead (fail open).
 
 ## Honest limits
 
