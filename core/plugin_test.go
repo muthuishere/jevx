@@ -2,10 +2,13 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEval(t *testing.T) {
@@ -115,5 +118,33 @@ func TestRunBashGuardDecisions(t *testing.T) {
 	d, rec := c.Run("bash-guard", guard, "PreToolUse", pay)
 	if d.Action != "allow" || rec["error"] == nil {
 		t.Fatalf("endpoint failure must fail open with the error recorded: %q %v", d.Action, rec["error"])
+	}
+}
+
+// An --exec plugin hands the event to a command: its stdout is the decision, it gets the event JSON on stdin, and a
+// failing or hanging command fails OPEN (allow, error recorded) instead of blocking every tool call.
+func TestRunExecPlugin(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+	setHome(t, t.TempDir())
+	c := Config{Plugins: map[string]Plugin{}}
+	pay := Payload{"tool_name": "Bash", "tool_input": map[string]any{"command": "ls"}}
+	pl := Plugin{On: "PreToolUse:Bash", Exec: `grep -q '"command":"ls"' && echo '{"decision":"x"}'`}
+	if d, rec := c.Run("ext", pl, "PreToolUse", pay); d.Action != "exec" || d.Raw != `{"decision":"x"}` || rec["error"] != nil {
+		t.Fatalf("stdout passes through and stdin carries the event: %+v %v", d, rec["error"])
+	}
+	pl.Exec = "exit 3"
+	if d, rec := c.Run("ext", pl, "PreToolUse", pay); d.Action != "allow" || rec["error"] == nil {
+		t.Fatalf("a failing command fails open: %+v", d)
+	}
+	old := ExecTimeout
+	ExecTimeout = 300 * time.Millisecond
+	defer func() { ExecTimeout = old }()
+	pl.Exec = "sleep 5"
+	t0 := time.Now()
+	d, rec := c.Run("ext", pl, "PreToolUse", pay)
+	if d.Action != "allow" || !strings.Contains(fmt.Sprint(rec["error"]), "no answer within") || time.Since(t0) > 3*time.Second {
+		t.Fatalf("a hung command fails open within the timeout: %+v %v after %s", d, rec["error"], time.Since(t0))
 	}
 }

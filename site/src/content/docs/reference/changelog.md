@@ -6,6 +6,7 @@ description: What changed in each jevx release, newest first. Written by the rel
 ## v0.12.13 (2026-10-07)
 
 - A plugin enabled in one repo (`jevx plugin add ... --local`) keeps its Claude Code hook when `jevx install`, an installer or an upgrade runs from another folder. In v0.12.12 that removed the repo's hook. jevx now remembers folders that have plugins and forgets one when its `.jevx/plugins.json` is gone.
+- A plugin's `--exec` command gets 15 seconds. One that hangs now fails open (the tool call goes ahead, the error is logged) instead of holding every tool call until Claude Code's 20-second hook limit.
 - Release checks wait for npm to serve a new version before testing the npm install, and fail if a default install (no plugin enabled) leaves any jevx hook in Claude Code's settings, on Linux, macOS and Windows, through install.sh, install.cmd and npm.
 
 ## v0.12.12 (2026-10-06)

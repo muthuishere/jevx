@@ -10,6 +10,7 @@ package core
 // Plugins ship disabled, and start in shadow mode: they log what they would do and act only after `plugin enable`.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -350,17 +351,27 @@ func summarize(ans map[string]Answer) string {
 	return strings.Join(parts, ", ")
 }
 
+// ExecTimeout bounds an --exec command. It is below the 20 s the settings.json hook entry allows, so a hung command
+// fails open here (allow, error logged) instead of being killed by the agent on every tool call.
+var ExecTimeout = 15 * time.Second
+
 func runExec(command string, in map[string]any) (Decision, error) {
 	b, _ := json.Marshal(in)
+	ctx, cancel := context.WithTimeout(context.Background(), ExecTimeout)
+	defer cancel()
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/C", command)
+		cmd = exec.CommandContext(ctx, "cmd", "/C", command)
 	} else {
-		cmd = exec.Command("sh", "-c", command)
+		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
+	cmd.WaitDelay = time.Second // a child that keeps stdout open cannot hold us past the timeout
 	cmd.Stdin = strings.NewReader(string(b))
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
+	if ctx.Err() == context.DeadlineExceeded {
+		return Decision{}, fmt.Errorf("exec %q: no answer within %s", command, ExecTimeout)
+	}
 	if err != nil {
 		return Decision{}, fmt.Errorf("exec %q: %v", command, err)
 	}
