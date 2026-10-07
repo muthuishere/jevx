@@ -62,7 +62,10 @@ say "changelog entry and release commit for $next"
 # that adds the changelog entry is always new.
 log=site/src/content/docs/reference/changelog.md
 if grep -q "^## $next " "$log"; then
-  # a hand-written entry for this version is already there: keep it; the empty commit still gives the tag a new commit
+  # a hand-written entry for this version is already there: keep it. One written ahead says "(unreleased)" so the live
+  # site never announces a version before it ships; the release commit puts today's date in its place.
+  sed -i.bak "s/^## $next (unreleased)\$/## $next ($(date +%Y-%m-%d))/" "$log" && rm -f "$log.bak"
+  git add "$log"
   git commit -q --allow-empty -m "Release $next"
 else
 entry=$(mktemp)
