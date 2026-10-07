@@ -1035,14 +1035,12 @@ func State(req, text string, actions []string) string {
 			text = string([]rune(text)[:len([]rune(text))*7/10]) + " …"
 		case len([]rune(req)) > 300:
 			req = string([]rune(req)[:len([]rune(req))*7/10]) + " …"
-		default:
+		default: // shorten each action, rebuild, then cut by character (never half a multi-byte one)
 			for j := range acts {
-				if len(acts[j]) > 120 {
-					acts[j] = acts[j][:120]
-				}
+				acts[j] = firstRunes(acts[j], 120)
 			}
-			s = s[:min(len(s), budget)]
-			return s
+			s = "Request: " + req + "\nAgent: " + text + "\nActions:\n- " + strings.Join(acts, "\n- ")
+			return firstRunes(s, budget)
 		}
 	}
 	return "Request: " + req + "\nAgent: " + text
