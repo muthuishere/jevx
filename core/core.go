@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 //go:embed questions.json
@@ -1009,8 +1010,9 @@ func cut(t string, n int) string {
 	return string([]rune(t)[:n]) + " …[cut]"
 }
 
-// State renders one agent turn as the premise: request, agent text, actions, trimmed to ~440 tokens by a character budget
-// (actions first, then the agent text, then the request; the server also truncates a long premise).
+// State renders one agent turn as the premise: request, agent text, actions, trimmed to ~440 tokens by a 1600-byte
+// budget (actions first, then the agent text, then the request; the server also truncates a long premise). Bytes, not
+// characters, approximate tokens for every script; cuts still happen on character boundaries.
 func State(req, text string, actions []string) string {
 	const budget = 1600
 	if text == "" {
@@ -1025,8 +1027,8 @@ func State(req, text string, actions []string) string {
 		} else {
 			s += "Actions: none"
 		}
-		if len(s) <= budget {
-			return s
+		if len(s) <= budget { // bytes on purpose: closer to tokens than characters for non-Latin text, so the server
+			return s // (which cuts a long premise from the END, where the actions are) gets a premise it keeps whole
 		}
 		switch {
 		case len(acts) > 3:
@@ -1040,7 +1042,7 @@ func State(req, text string, actions []string) string {
 				acts[j] = firstRunes(acts[j], 120)
 			}
 			s = "Request: " + req + "\nAgent: " + text + "\nActions:\n- " + strings.Join(acts, "\n- ")
-			return firstRunes(s, budget)
+			return firstBytes(s, budget)
 		}
 	}
 	return "Request: " + req + "\nAgent: " + text
@@ -1050,6 +1052,17 @@ var (
 	wrapperRx   = regexp.MustCompile(`^\s*<(command-name|command-message|local-command|system-reminder|task-notification|cross-session-message|bash-)`)
 	interruptRx = regexp.MustCompile(`^\[Request interrupted by user`)
 )
+
+// firstBytes is at most n bytes of s, ending on a character boundary.
+func firstBytes(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
 
 // firstRunes is the first n characters of s, never half a multi-byte one.
 func firstRunes(s string, n int) string {

@@ -51,16 +51,13 @@ func TestLastTurnPicksTheGenuineRequest(t *testing.T) {
 	}
 }
 
-// State fits a turn into ~1600 characters. When even a short request and text leave too little room, the fallback
-// shortens each action (the cut must apply, not be thrown away) and never ends in half a character.
+// State fits a turn into a 1600-byte budget (a token proxy). Its last-resort trim must cut on a character boundary:
+// a long Tamil turn used to come out as invalid UTF-8.
 func TestStateFallbackCutsByCharacter(t *testing.T) {
 	long := strings.Repeat("சொல் ", 60) // 300 characters, 900+ bytes each
 	acts := []string{"Write a.md: " + long, "Write b.md: " + long, "Bash: " + long}
 	s := State(strings.Repeat("அ", 290), strings.Repeat("ஆ", 390), acts)
-	if !utf8.ValidString(s) || len([]rune(s)) > 1600 {
-		t.Fatalf("valid UTF-8 within 1600 characters: valid=%v len=%d", utf8.ValidString(s), len([]rune(s)))
-	}
-	if !strings.Contains(s, "Bash: ") {
-		t.Fatalf("shortening the actions must leave room for all of them:\n%s", s)
+	if !utf8.ValidString(s) || len(s) > 1600 || !strings.HasPrefix(s, "Request: ") {
+		t.Fatalf("valid UTF-8 within 1600 bytes, request first: valid=%v bytes=%d", utf8.ValidString(s), len(s))
 	}
 }
