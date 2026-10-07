@@ -1053,6 +1053,14 @@ var (
 	interruptRx = regexp.MustCompile(`^\[Request interrupted by user`)
 )
 
+// firstRunes is the first n characters of s, never half a multi-byte one.
+func firstRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
 func actionOf(name string, in map[string]any) string {
 	s := func(k string) string { v, _ := in[k].(string); return v }
 	switch name {
@@ -1061,7 +1069,7 @@ func actionOf(name string, in map[string]any) string {
 		if d == "" {
 			d = s("content")
 		}
-		return fmt.Sprintf("%s %s: %s", name, s("file_path"), d[:min(len(d), 400)])
+		return fmt.Sprintf("%s %s: %s", name, s("file_path"), firstRunes(d, 400))
 	case "Bash":
 		return "Bash: " + s("command")
 	case "Skill":
@@ -1075,10 +1083,10 @@ func actionOf(name string, in map[string]any) string {
 		if d == "" {
 			d = s("to")
 		}
-		return fmt.Sprintf("%s %s: %s", name, d, p[:min(len(p), 200)])
+		return fmt.Sprintf("%s %s: %s", name, d, firstRunes(p, 200))
 	}
 	b, _ := json.Marshal(in)
-	return name + " " + string(b[:min(len(b), 200)])
+	return name + " " + firstRunes(string(b), 200)
 }
 
 // LastTurn reads a Claude Code transcript (JSONL) and returns the last genuine human request with everything the agent
