@@ -3,6 +3,10 @@ title: Changelog
 description: What changed in each jevx release, newest first. Written by the release command from the commits since the previous release.
 ---
 
+## v0.12.14 (unreleased)
+
+- Docs: the 143-claim memory measurement without notes is AUC 0.49 (0.486), not 0.48, and the notes improvement is McNemar p<0.001 (0.0004 to 0.0008, depending on how the one answer at exactly p=0.5 is counted), not p=0.0004. Recomputed from the stored answers; the other numbers (70 of 72 changed numbers caught, 25 of 71 true claims wrongly failed) are unchanged. The v0.12.5 entry below keeps the old figure as history.
+
 ## v0.12.13 (2026-10-07)
 
 - A plugin enabled in one repo (`jevx plugin add ... --local`) keeps its Claude Code hook when `jevx install`, an installer or an upgrade runs from another folder. In v0.12.12 that removed the repo's hook. jevx now remembers folders that have plugins and forgets one when its `.jevx/plugins.json` is gone.

@@ -143,7 +143,7 @@ jevx ask --memory docs --memory-k 3 --memory-budget 2000 --lines claims.txt --no
 ```
 
 **Honest caveat.** On the largest held-out run (143 fresh claims: 71 true, 72 with one changed number), notes lifted a small local
-model from AUC 0.48 to 0.76 (p=0.0004). Earlier, smaller runs looked better (0.30 to 0.86 at n=68), so quote the large one.
+model from AUC 0.49 to 0.76 (p<0.001). Earlier, smaller runs looked better (0.30 to 0.86 at n=68), so quote the large one.
 It is **weakest at spotting a changed number**: a note that matches except for one figure pulls the answer toward "true".
 `--memory-strict` compares the figures, code and names in the item with those in the retrieved notes: on the same 143 claims it
 missed 2 of 72 changed numbers (3%) and lifted accuracy to 81%, but it wrongly rejected 25 of 71 true claims (35%): it flags a

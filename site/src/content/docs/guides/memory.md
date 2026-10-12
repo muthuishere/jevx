@@ -54,11 +54,11 @@ Measured on held-out claims, with the configuration frozen before each test (k 3
 
 | condition | AUC | accuracy | changed numbers caught | true claims wrongly failed |
 | --- | --- | --- | --- | --- |
-| no notes | 0.48 | 49% | 66 / 72 | 67 / 71 (it calls almost everything false) |
+| no notes | 0.49 | 49% | 66 / 72 | 67 / 71 (it calls almost everything false) |
 | notes | **0.76** | 69% | 50 / 72 | 22 / 71 |
 | notes + `--memory-strict` | n/a | **81%** | **70 / 72** | 25 / 71 |
 
-Notes help (McNemar p=0.0004), and `--memory-strict` helps on top of them (p=0.0005). Its two error rates on this run: it **misses 2 of 72 changed numbers (3%)** and **wrongly rejects 25 of 71 true claims (35%)**. So a strict "no" flags the claim for a person to check; it never decides alone.
+Notes help (McNemar p<0.001), and `--memory-strict` helps on top of them (p=0.0005). Its two error rates on this run: it **misses 2 of 72 changed numbers (3%)** and **wrongly rejects 25 of 71 true claims (35%)**. So a strict "no" flags the claim for a person to check; it never decides alone.
 
 **The weak spot is a changed number.** A note that matches except for one figure pulls the answer toward "true": with notes alone, 50 of 72 changed numbers were caught. `--memory-strict` compares the numbers, `` `code` `` and names in the item with those in the retrieved notes and fails a yes/no claim when one is missing. On its own, the rule flags a true claim wrongly only when the right section was not among the retrieved ones; a wider retrieval window was tested and did not help, so the defaults stay.
 
