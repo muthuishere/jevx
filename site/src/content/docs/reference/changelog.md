@@ -5,6 +5,10 @@ description: What changed in each jevx release, newest first. Written by the rel
 
 ## v0.12.14 (unreleased)
 
+- **Profile types.** A profile's `type` says which API it speaks: `typesafe` (System One, the default), `cloudflare` (Workers AI `/ai/run`) or `openai` (the OpenAI Decisions API, `/v1/decisions`: questions go as a predicate / choice / score list, answers come back by name, and a refusal is an error, never a "no"). `jevx profile add NAME URL --type openai`, `jevx profile types`; `profile list` shows each profile's type. The older `style` field and `--style` flag still work. An `openai` profile sends at most 10 questions per request.
+- **Images.** `--image FILE` (repeat) sends a PNG or JPEG with the input, on `ask` and the shortcuts; `--images DIR|GLOB|FILE` is a batch with one input per image (`jevx filter "Is this damaged?" --images ./photos/` prints the matching files). typesafe profiles send images as System One `assets`, named in the state, with TypeSafe's `TypeSafe-Danger-Zone-Images: true` header; openai profiles send them as `input_image` parts. A cloudflare profile refuses images (exit 4) unless it sets `"images": true`. Image bytes are part of the cache key and are never redacted. See [Images and profile types](/jevx/guides/images/).
+- `jevx help` lists every command by purpose, the input and batch flags, and has topics: `jevx help profiles | images | batch`.
+
 - Docs: the 143-claim memory measurement without notes is AUC 0.49 (0.486), not 0.48, and the notes improvement is McNemar p<0.001 (0.0004 to 0.0008, depending on how the one answer at exactly p=0.5 is counted), not p=0.0004. Recomputed from the stored answers; the other numbers (70 of 72 changed numbers caught, 25 of 71 true claims wrongly failed) are unchanged. The v0.12.5 entry below keeps the old figure as history.
 
 ## v0.12.13 (2026-10-07)

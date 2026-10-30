@@ -91,3 +91,68 @@ func TestParallelBatchKeepsEachAnswerWithItsInput(t *testing.T) {
 		}
 	}
 }
+
+// TestImageBatch: --images DIR is one input per image file, in name order, shown by its path; filter prints the
+// matching files; a cloudflare profile refuses images with exit 4 before any call.
+func TestImageBatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			State     string                     `json:"state"`
+			Questions map[string]json.RawMessage `json:"questions"`
+			Assets    map[string]struct {
+				Data string `json:"data_base64"`
+			} `json:"assets"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		p := 0.1
+		if strings.HasSuffix(req.Assets["image1"].Data, "Ag==") || r.Header.Get("TypeSafe-Danger-Zone-Images") != "true" || !strings.Contains(req.State, "Image: image1") {
+			p = 0.9 // the second image's last byte is 2; a request without the header or the reference also says yes, and fails the test
+		}
+		ans := map[string]any{}
+		for k := range req.Questions {
+			ans[k] = map[string]any{"type": "noul", "noul": p}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"model": "stub", "answers": ans})
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "jevx")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Fatalf("build: %v\n%s", err, out)
+	}
+	imgs := filepath.Join(dir, "imgs")
+	_ = os.MkdirAll(imgs, 0o755)
+	for i, n := range []string{"a.png", "b.png", "notes.txt"} {
+		_ = os.WriteFile(filepath.Join(imgs, n), append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, 8)...), 0o644)
+		if i == 1 {
+			_ = os.WriteFile(filepath.Join(imgs, n), append([]byte("\x89PNG\r\n\x1a\n"), 0, 0, 0, 0, 0, 0, 0, 2), 0o644)
+		}
+	}
+	env := append(os.Environ(), "HOME="+dir, "USERPROFILE="+dir, "JEVX_CONFIG="+filepath.Join(dir, "cfg.json"), "JEVX_LEDGER=off")
+	run := func(args ...string) (string, int) {
+		cmd := exec.Command(bin, args...)
+		cmd.Env = env
+		out, _ := cmd.CombinedOutput()
+		return string(out), cmd.ProcessState.ExitCode()
+	}
+	run("profile", "add", "stub", srv.URL+"/v1/systemone", "--model", "stub")
+	out, code := run("ask", "--profile", "stub", "--no-context", "--images", imgs, "--noul", "x=Is it broken?")
+	rows := strings.Split(strings.TrimSpace(out), "\n")
+	if code != 0 || len(rows) != 3 || !strings.HasPrefix(rows[1], "no ") || !strings.HasSuffix(rows[1], "a.png") ||
+		!strings.HasPrefix(rows[2], "yes ") || !strings.HasSuffix(rows[2], "b.png") {
+		t.Fatalf("exit %d:\n%s", code, out)
+	}
+	if out, _ := run("filter", "Is it broken?", "--profile", "stub", "--no-context", "--images", imgs); strings.TrimSpace(out) != filepath.Join(imgs, "b.png") {
+		t.Fatalf("filter:\n%s", out)
+	}
+	if out, code := run("is", "Is it broken?", "--profile", "stub", "--no-context", "--image", filepath.Join(imgs, "b.png")); code != 0 || !strings.HasPrefix(out, "yes") {
+		t.Fatalf("is --image: exit %d %s", code, out)
+	}
+	run("profile", "add", "cf", srv.URL+"/x", "--type", "cloudflare", "--model", "m")
+	if out, code := run("is", "Is it broken?", "--profile", "cf", "--image", filepath.Join(imgs, "a.png")); code != 4 || !strings.Contains(out, "does not take images") {
+		t.Fatalf("cloudflare + image: exit %d %s", code, out)
+	}
+}

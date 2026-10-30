@@ -74,6 +74,7 @@ export default defineConfig({
 						{ label: 'Agent scenarios', slug: 'guides/scenarios' },
 						{ label: 'Memory', slug: 'guides/memory' },
 						{ label: 'Ask', slug: 'guides/ask' },
+						{ label: 'Images and profile types', slug: 'guides/images' },
 						{ label: 'Shortcuts: is, pick, filter, rank', slug: 'guides/shortcuts' },
 						{ label: 'Saved questions', slug: 'guides/questions' },
 						{ label: 'Context', slug: 'guides/context' },

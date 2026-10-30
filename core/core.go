@@ -76,7 +76,9 @@ func expand(p string) string {
 type Profile struct {
 	URL       string            `json:"url"`
 	Model     string            `json:"model"`
-	Style     string            `json:"style,omitempty"`     // request shape: typesafe (flat {model,state,questions}, the default) or cloudflare ({model, input} envelope with a {result,...} reply)
+	Type      string            `json:"type,omitempty"`      // the API it speaks: typesafe (System One, the default) | cloudflare | openai (jevx profile types)
+	Images    *bool             `json:"images,omitempty"`    // whether images may be sent; unset: the type's default
+	Style     string            `json:"style,omitempty"`     // legacy name for type (typesafe | cloudflare)
 	Headers   map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
 	Questions string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
 	Note      string            `json:"note,omitempty"`
@@ -151,7 +153,14 @@ func (s Settings) Over(o Settings) Settings {
 }
 
 // Settings resolves the effective settings for a profile: Builtin < config defaults < profile defaults.
-func (c Config) Settings(p Profile) Settings { return Builtin.Over(c.Defaults).Over(p.Defaults) }
+// A profile type with a smaller question limit (openai: 10) lowers chunk below the config defaults.
+func (c Config) Settings(p Profile) Settings {
+	var typed Settings
+	if t, ok := LookupType(p.Kind()); ok && t.Chunk > 0 {
+		typed.Chunk = ip(t.Chunk)
+	}
+	return Builtin.Over(typed).Over(c.Defaults).Over(p.Defaults)
+}
 
 // Question is a named, reusable question: a System One question plus its own thresholds (optional).
 type Question struct {
@@ -177,8 +186,12 @@ func (q Question) Wire() map[string]any {
 	return m
 }
 
-// Norm folds the legacy fields into url + headers.
+// Norm folds the legacy fields into url, type and headers.
 func (p Profile) Norm() Profile {
+	if p.Type == "" {
+		p.Type = p.Style
+	}
+	p.Style = ""
 	if p.URL == "" {
 		p.URL = p.Endpoint
 	}
@@ -748,6 +761,16 @@ func Redactions(p Profile, state string, qs map[string]any) map[string]int {
 // It retries 429 / 5xx / network errors with backoff, rejects a reply that does not answer exactly the questions asked
 // or carries out-of-range probabilities (fail closed), and appends one line per call to the ledger.
 func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (map[string]Answer, []byte, error) {
+	return AskImages(p, state, nil, qs, timeout)
+}
+
+// AskImages is AskRaw with images: sent as System One assets (typesafe, cloudflare) or input_image parts (openai).
+// The state must already name them (WithImageRefs). A profile that does not take images is refused before any call.
+func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout time.Duration) (map[string]Answer, []byte, error) {
+	kind := p.Kind()
+	if len(imgs) > 0 && !p.TakesImages() {
+		return nil, nil, fmt.Errorf("this profile (type %s) does not take images; use a typesafe or openai profile, or set \"images\": true on it if its model does", kind)
+	}
 	if MissingEnv(p.Norm()) != "" {
 		return nil, nil, ErrNeedKey
 	}
@@ -764,14 +787,31 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 		NoteRedacted(kinds)
 	}
 	core := map[string]any{"state": sendState, "questions": sendQs}
+	if len(imgs) > 0 && kind != TypeOpenAI {
+		assets := map[string]any{}
+		for _, im := range imgs {
+			assets[im.Name] = im.asset()
+		}
+		core["assets"] = assets
+		if kind == TypeTypeSafe { // TypeSafe's opt-in for image input; a header the profile sets itself wins
+			h := map[string]string{ImagesHeader: "true"}
+			for k, v := range p.Headers {
+				h[k] = v
+			}
+			p.Headers = h
+		}
+	}
 	// Cloudflare's universal /ai/run is an envelope: {"model": ..., "input": {...}} with a
-	// {"result": ..., "success": ...} reply (Cloudflare REST 2026-10). Detect and adapt; the
-	// System One contract stays the default everywhere else.
-	isCF := p.Style == "cloudflare" || (p.Style == "" && strings.Contains(p.URL, "/ai/run"))
+	// {"result": ..., "success": ...} reply (Cloudflare REST 2026-10). OpenAI's Decisions API takes
+	// {"model", "input", "questions": [...]} and answers with a list. System One is the default.
+	isCF := kind == TypeCloudflare
 	var body []byte
-	if isCF {
+	switch kind {
+	case TypeCloudflare:
 		body, _ = json.Marshal(map[string]any{"model": p.Model, "input": core})
-	} else {
+	case TypeOpenAI:
+		body, _ = json.Marshal(map[string]any{"model": p.Model, "input": openaiInput(sendState, imgs), "questions": openaiQuestions(sendQs)})
+	default:
 		core["model"] = p.Model
 		body, _ = json.Marshal(core)
 	}
@@ -822,6 +862,9 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 			}
 		}
 	}
+	if kind == TypeOpenAI && err == nil {
+		raw, err = openaiAnswers(raw, qs)
+	}
 	var out struct {
 		Model   string            `json:"model"`
 		Answers map[string]Answer `json:"answers"`
@@ -834,7 +877,7 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 			err = validate(qs, out.Answers)
 		}
 	}
-	ledger(p, qs, out.Model, out.Usage, time.Since(t0), err, redacted)
+	ledger(p, qs, out.Model, out.Usage, time.Since(t0), err, redacted, len(imgs))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -898,9 +941,10 @@ func validate(qs map[string]any, ans map[string]Answer) error {
 }
 
 // ledger appends one JSON line per call to ~/.local/share/jevx/calls.jsonl: profile, caller (the calling agent's cwd,
-// or JEVX_CALLER), host, hosted, model, question count and hash, tokens, latency, how many items were redacted, error.
+// or JEVX_CALLER), host, profile type, hosted, model, question count and hash, tokens, latency, how many items were
+// redacted, how many images were sent, error.
 // Never the state, the question text or a header. JEVX_LEDGER=off disables it.
-func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted int) {
+func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted, images int) {
 	if !LedgerOn || firstEnv("JEVX_LEDGER", "JEVCLI_LEDGER") == "off" {
 		return
 	}
@@ -912,7 +956,10 @@ func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d 
 	h := sha256.Sum256(qb)
 	row := map[string]any{"ts": time.Now().UTC().Format(time.RFC3339), "host": host, "model": model, "questions": len(qs),
 		"qhash": hex.EncodeToString(h[:6]), "ms": d.Milliseconds(), "usage": usage,
-		"profile": ActiveProfile, "caller": Caller(), "hosted": Hosted(p), "redacted": redacted}
+		"profile": ActiveProfile, "caller": Caller(), "hosted": Hosted(p), "redacted": redacted, "type": p.Kind()}
+	if images > 0 {
+		row["images"] = images
+	}
 	if err != nil {
 		row["error"] = trimErr(err.Error())
 	}

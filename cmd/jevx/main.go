@@ -7,7 +7,7 @@
 //	jevx uninstall                            remove the skill and jevx's hook entries
 //	jevx hook enable|disable stop | mode shadow|block | profile NAME | status | review [N] | run stop
 //	jevx config show | set-endpoint PROFILE URL [MODEL] | default PROFILE
-//	jevx profile list | add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE] | use NAME | remove NAME | show NAME
+//	jevx profile list | types | add NAME URL [--type T] [--model M] [--header 'K: V' ...] [--questions FILE] | use NAME | remove NAME | show NAME
 package main
 
 import (
@@ -485,7 +485,7 @@ func main() {
 	a := takeCwd(os.Args[2:])
 	switch os.Args[1] {
 	case "help", "-h", "--help":
-		pr("usage: jevx ask|is|pick|filter|rank|question|memory|context|defaults|cache|judge|plugin|hook|profile|stats|install|uninstall|skill|version\n  jevx COMMAND -h for flags; jevx skill for the full guide; https://muthuishere.github.io/jevx/")
+		cmdHelp(a)
 	case "ask", "a":
 		cmdAsk(a)
 	case "is", "pick", "filter", "rank":
@@ -526,6 +526,75 @@ func main() {
 	}
 }
 
+// cmdHelp is `jevx help [TOPIC]`: an overview of every command, or one topic in depth.
+func cmdHelp(args []string) {
+	topic := ""
+	if len(args) > 0 {
+		topic = args[0]
+	}
+	switch topic {
+	case "":
+		pr(`usage: jevx ask|is|pick|filter|rank|question|memory|context|defaults|cache|judge|plugin|hook|profile|stats|install|uninstall|skill|version
+  jevx COMMAND -h for flags; jevx skill for the full guide; https://muthuishere.github.io/jevx/
+
+Ask (verdicts, never prose; exit 0 yes, 1 no, 3 unsure, 4 error)
+  is "QUESTION" [input]                 yes / no / unsure + P
+  pick "QUESTION" key=desc ... [input]  the chosen key + confidence
+  filter "QUESTION" < lines [-v]        the lines whose answer is yes, like grep by meaning
+  rank "QUESTION" < lines [--top N]     every line with P(yes), best first
+  ask NAME,... | --noul/--choice/--score NAME="Q..."   many questions, one input or a batch
+  judge --request TEXT --proposal TEXT  would the user accept this turn?
+
+Inputs: stdin, --in TEXT|@file|'{json}', and images with --image FILE (PNG/JPEG, repeat)
+Batch (parallel, in input order; a table, --raw for JSONL):
+  --lines FILE      one text input per line          --states FILE.jsonl  one JSON input per line
+  --images DIR|GLOB one input per image file          --parallel N         concurrent requests
+
+Configure
+  profile list|types|add|use|remove|show   endpoints and the API each speaks (typesafe, cloudflare, openai)
+  question add|list|show|remove            saved questions        defaults   every setting and its source
+  context                                  the ## Jev context     cache      the local answer cache
+  memory add|index|check|show|list         judge against your own notes
+Agents: install, uninstall, skill, plugin, hook, stats
+
+More: jevx help profiles | images | batch`)
+	case "profiles", "profile", "types":
+		pr(`A profile is one endpoint: url, model, headers (secrets as $VARS, expanded per request) and its type, the API it speaks.
+With no config, jevx uses the built-in "jev" profile: TypeSafe's hosted Jev with $TYPESAFE_API_KEY.
+`)
+		cmdProfile([]string{"types"})
+		pr(`
+Examples:
+  jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx
+  jevx profile add cf 'https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run' --type cloudflare --model typesafe/jev --header 'Authorization: Bearer $CF_API_TOKEN'
+  jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
+  jevx profile use oai          or per call: --profile oai`)
+	case "images", "image":
+		pr(`Images (PNG or JPEG, up to 16 MB each) go with an input to profiles that take them: type typesafe and openai do;
+cloudflare does not unless the profile sets "images": true (jevx profile add ... --images).
+  typesafe  sent as System One "assets" (image1, image2, ...), named in the state, with the TypeSafe-Danger-Zone-Images header
+  openai    sent as input_image parts (base64 data URLs) next to the text
+The image bytes are part of the cache key; they are never redacted, so do not send screenshots of secrets to a hosted endpoint.
+
+  jevx is "Is this an error page?" --image shot.png
+  jevx ask --image before.png --image after.png --noul same="Do the two screenshots show the same layout?"
+  jevx filter "Does this photo show a damaged package?" --images ./returns/       # prints the matching files
+  jevx ask --images 'shots/*.png' --in "Checkout page" --choice state="Which state?|ok=works;error=error shown;blank=blank page"`)
+	case "batch":
+		pr(`A batch asks every question about every input, --parallel N at a time (default 8), and prints one row per input in
+input order: VERDICT  P  INPUT (a VERDICT/P pair per question when several are asked). --raw prints JSONL.
+A failed input prints its error on stderr and the rest go on; the batch exits 4 if any failed, else 0.
+  --lines FILE|-        one text input per line
+  --states FILE.jsonl   one JSON object (or JSON string) per line
+  --images DIR|GLOB|FILE  one input per image; --in gives them all the same text
+  --image FILE          attach an image to every input of a --lines / --states batch
+filter and rank are batches too. Each request carries up to "chunk" questions (32; 10 for openai profiles).
+Every API is called once per input: none of the three has a batch endpoint, so jevx runs the calls in parallel.`)
+	default:
+		die("no help topic %q: jevx help [profiles | images | batch]", topic)
+	}
+}
+
 func cmdProfile(args []string) {
 	cfg := core.LoadConfig()
 	if len(args) == 0 || args[0] == "list" {
@@ -554,9 +623,13 @@ func cmdProfile(args []string) {
 			if p.Note == "built in" {
 				note = "  (built in)"
 			}
-			pr("%s %-10s %s  model=%s%s%s", mark, n, p.URL, p.Model, hs, note)
+			img := ""
+			if p.TakesImages() {
+				img = "  images"
+			}
+			pr("%s %-10s %-10s %s  model=%s%s%s%s", mark, n, p.Kind(), p.URL, p.Model, img, hs, note)
 		}
-		pr("(* = default; change with: jevx profile use NAME)")
+		pr("(* = default; change with: jevx profile use NAME; the types: jevx profile types)")
 		return
 	}
 	need := func(n int, u string) {
@@ -565,10 +638,24 @@ func cmdProfile(args []string) {
 		}
 	}
 	switch args[0] {
+	case "types":
+		for _, t := range core.Types {
+			img := "no"
+			if t.Images {
+				img = "yes"
+			}
+			pr("%-11s %s\n%-11s body    %s\n%-11s images  %s   example url  %s\n", t.Name, t.Summary, "", t.Body, "", img, t.URL)
+		}
+		pr("add one: jevx profile add NAME URL --type TYPE --model M [--header 'Authorization: Bearer $VAR']   (default type: typesafe)")
+		pr("images: --image FILE / --images DIR go only to a profile that takes them; override per profile with --images / --no-images")
+		return
 	case "add":
-		need(3, "add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE]")
+		need(3, "add NAME URL [--type typesafe|cloudflare|openai] [--model M] [--header 'K: V' ...] [--questions FILE]")
 		fs := flag.NewFlagSet("profile add", flag.ExitOnError)
-		m, q, st := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON"), fs.String("style", "typesafe", "request shape: typesafe (flat body) or cloudflare ({model, input} envelope)")
+		m, q := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON")
+		st := fs.String("type", "", "the API the endpoint speaks: "+core.TypeNames()+" (default typesafe; jevx profile types)")
+		fs.StringVar(st, "style", "", "legacy name for --type")
+		imgOn, imgOff := fs.Bool("images", false, "this endpoint takes images even if its type does not by default"), fs.Bool("no-images", false, "never send images to this endpoint")
 		var hdr multi
 		fs.Var(&hdr, "header", `request header "Name: value" (repeat); reference env vars for secrets: "Authorization: Bearer $JEV_API_KEY"`)
 		_ = fs.Parse(args[3:])
@@ -580,10 +667,22 @@ func cmdProfile(args []string) {
 			}
 			hm[strings.TrimSpace(k)] = strings.TrimSpace(v)
 		}
-		if *st != "typesafe" && *st != "cloudflare" {
-			die("--style: want typesafe or cloudflare, got %q", *st)
+		if *st == "" {
+			*st = core.Profile{URL: args[2]}.Kind() // a Cloudflare /ai/run url is recognised; otherwise typesafe
 		}
-		cfg.Profiles[args[1]] = core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Style: *st}
+		if _, ok := core.LookupType(*st); !ok {
+			die("--type: want one of %s, got %q (jevx profile types)", core.TypeNames(), *st)
+		}
+		np := core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Type: *st}
+		switch {
+		case *imgOn && *imgOff:
+			die("give --images or --no-images, not both")
+		case *imgOn:
+			np.Images = &[]bool{true}[0]
+		case *imgOff:
+			np.Images = &[]bool{false}[0]
+		}
+		cfg.Profiles[args[1]] = np
 		if ph, ok := cfg.Profiles["default"]; ok && ph.URL == "" && args[1] != "default" {
 			delete(cfg.Profiles, "default") // the seeded placeholder is replaced by the first real profile
 		}
@@ -611,7 +710,7 @@ func cmdProfile(args []string) {
 		pr("%s", b)
 		return
 	default:
-		die("usage: jevx profile list | add | use | remove | show")
+		die("usage: jevx profile list | types | add | use | remove | show")
 	}
 	if err := core.SaveConfig(cfg); err != nil {
 		die("%v", err)

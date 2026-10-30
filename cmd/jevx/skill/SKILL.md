@@ -1,6 +1,6 @@
 ---
 name: jevx
-description: Fast yes/no, pick-one and rating judgements from a Jev-style decision model (any System One endpoint), instead of reasoning them out yourself. Use when you must classify, filter, triage, route, dedupe, rank or check many items (files, lines, tickets, messages, records), when a branch in your work depends on meaning ("is this urgent", "which team owns this"), when you are about to ask the user to pick between options, and before handing back a turn. Trigger: is this X, which of these, triage, classify, filter these, rank these, would the user accept this, what would the user pick, ask jev.
+description: Fast yes/no, pick-one and rating judgements from a Jev-style decision model (TypeSafe System One, Cloudflare Workers AI or the OpenAI Decisions API), about text or images, instead of reasoning them out yourself. Use when you must classify, filter, triage, route, dedupe, rank or check many items (files, lines, tickets, messages, records, screenshots, photos), when a branch in your work depends on meaning ("is this urgent", "which team owns this"), when you are about to ask the user to pick between options, and before handing back a turn. Trigger: is this X, which of these, triage, classify, filter these, rank these, would the user accept this, what would the user pick, ask jev.
 ---
 
 # jevx: judgements in milliseconds
@@ -41,7 +41,8 @@ jevx ask --states tickets.jsonl team,sev --parallel 8                # batch ove
     (rating).
   - A file: `--questions set.json`.
 - **Input**: stdin, `--in "text" | @file | '{json}'`, `--lines FILE` (one input per line) or `--states FILE.jsonl` (one JSON
-  object or string per line).
+  object or string per line). Images: `--image FILE` (PNG/JPEG, repeat) with the input, or `--images DIR|GLOB` for a
+  batch with one input per image (see below).
 - **Output for one input**: one line per question, `NAME  VERDICT  P`. The verdict is `yes` / `no` / `unsure` for a
   noul, the key or `unsure` for a choice, the level or `unsure` for a score. `--json` gives the same as JSON, and `--raw`
   gives the server's full reply.
@@ -51,6 +52,30 @@ jevx ask --states tickets.jsonl team,sev --parallel 8                # batch ove
 - **Exit codes** (one input): **0** all yes or decided, **1** a "no", **3** an unsure, **4** an error (network, auth,
   invalid reply). An error is never a "no". On 4, say the call failed; on 3, check it yourself or ask the user. A batch
   exits 0, or 4 if any input failed (that line carries `"error"`).
+
+## Images: screenshots, photos, diagrams
+
+```bash
+jevx is "Is an error message shown?" --image shot.png                     # one image with the question
+jevx ask --image before.png --image after.png --noul same="Is the layout the same in both?"
+jevx filter "Does this photo show a damaged package?" --images ./returns/  # batch: prints the matching files
+jevx ask --images 'shots/*.png' --in "Checkout page" --choice state="Which state?|ok=works;error=error shown;blank=blank page"
+```
+- Images go only to profiles that take them: type `typesafe` (the default; needs an image-capable model such as
+  jev-1.14.0, which TypeSafe calls a "danger zone" feature, not for production) and `openai`. A `cloudflare` profile
+  refuses them with exit 4 and says so; do not retry, tell the user or use another profile (`jevx profile list`).
+- Write the question about what is visible: "Does the screenshot show an error dialog?" beats "Is it broken?".
+- Images are **not redacted** before a hosted call. Never send a screenshot that shows keys, passwords or personal data.
+- `--images` takes a folder, a glob or a file listing paths; `--in` gives every image the same text. `--image` with
+  `--lines` / `--states` attaches the same image to every row.
+
+## Profiles: which API answers
+
+Each profile has a `type`: `typesafe` (System One / Jev, the default and the built-in `jev` profile), `cloudflare`
+(Workers AI `/ai/run`) or `openai` (OpenAI Decisions API, `/v1/decisions`). Questions and verdicts are the same for all
+three; jevx converts the request and the reply. `jevx profile list` shows each profile's type and whether it takes
+images; `jevx help profiles` explains the types. Use `--profile NAME` only for a profile the user already set up; do not
+add one unasked.
 
 ## Judge against the user's notes: `--memory`
 
@@ -135,7 +160,7 @@ current directory unless you pass `--cwd DIR`.
 | `yes` / `no` | 0.8 / 0.2 | a noul P at or above `yes` is yes, at or below `no` is no, anything between is unsure |
 | `min_confidence` | 0.6 | a choice or score below this is unsure |
 | `parallel` | 8 | concurrent requests in a batch |
-| `retries` / `timeout_s` / `chunk` | 3 / 60 / 32 | tries on 429/5xx, seconds per request, questions per request |
+| `retries` / `timeout_s` / `chunk` | 3 / 60 / 32 | tries on 429/5xx, seconds per request, questions per request (10 for an `openai` profile) |
 | `ledger` | true | log each call without content to `~/.local/share/jevx/calls.jsonl` (`jevx stats`); a hosted call is scrubbed of secrets, emails and phones first |
 | `cache` / `cache_ttl_days` | true / 7 | reuse a stored answer for the same endpoint, model, input and question; `--fresh` on a call asks again; `jevx cache enable\|disable\|clear` |
 | `accept_min` / `more_max` | 0.35 / 0.65 | legacy Stop hook thresholds (the `stop-judge` plugin has its own condition) |
@@ -159,6 +184,7 @@ Read it the first time you use jevx in a session, or whenever an answer comes ba
 | decide if two records are one entity | `printf 'A: %s\nB: %s' "$a" "$b" \| jevx ask --noul same="Are A and B the same customer?"` |
 | check a claim against a source | `jevx ask --noul ok="Does the text say payment is due in October?" < invoice.txt` |
 | rank search results | `jevx rank "Does this answer: how do I get a refund?" --top 5 < results.txt` |
+| look through 40 screenshots for a broken page | `jevx filter "Does this screenshot show an error or a blank page?" --images shots/` |
 | ask the user "A or B?" | `ask --in "<the facts>" --choice pick="Which would the user choose?\|a=<A>;b=<B>"`; ask only on exit 3 |
 | hand back your turn | `jevx judge --request "<user's request>" --proposal "<your final message>"` |
 
@@ -211,7 +237,9 @@ skill works but plugins do not run yet.
 curl -fsSL https://muthuishere.github.io/jevx/install.sh | sh      # this skill for Claude Code, Codex and ~/.agents
 export TYPESAFE_API_KEY=...   # the user's key: hosted Jev works with no config at all
 jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # only for a custom endpoint (a local openjevx here)
+jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
 ```
+`jevx help` lists every command; `jevx help profiles | images | batch` go deeper.
 If a call exits 4 asking for `TYPESAFE_API_KEY` (or another variable), tell the user which variable to set. Do not
 guess one, and never ask them to paste a key into the chat.
 

@@ -61,10 +61,13 @@ Set your key and you are done: jevx uses hosted Jev by default, with no config f
 export TYPESAFE_API_KEY=...        # from console.typesafe.ai/keys; read at request time, never written anywhere
 ```
 
-Running your own System One endpoint (self-hosted, a local model, another provider)? Add a profile for it:
+Running your own System One endpoint (self-hosted, a local model, another provider)? Add a profile for it. A profile's
+`--type` is the API it speaks: `typesafe` (System One, the default), `cloudflare` (Workers AI) or `openai` (the OpenAI
+Decisions API); `jevx profile types` lists them.
 
 ```bash
 jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # openjevx's default port (v0.5.11+); then --profile openjevx
+jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
 ```
 
 ## Quickstart
@@ -114,6 +117,18 @@ yes      0.98  ERROR payment gateway timeout after 30s
 no       0.03  INFO  cache warmed 1200 keys
 yes      0.98  FATAL db connection refused
 ```
+
+## Images
+
+`--image FILE` sends a screenshot or photo (PNG/JPEG) with the question; `--images DIR|GLOB` is a parallel batch with one
+input per image. typesafe and openai profiles take images; a cloudflare profile refuses them unless it opts in.
+
+```console
+$ jevx is "Is an error message shown?" --image checkout.png
+$ jevx filter "Does this photo show a damaged package?" --images ./returns/     # prints the matching files
+```
+
+[Images and profile types](https://muthuishere.github.io/jevx/guides/images/) has the details.
 
 ## Context: from the files you already keep
 

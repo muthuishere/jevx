@@ -14,6 +14,10 @@ Usage of ask:
     	background for this call: TEXT or @file (repeat); added after the ## Jev sections
   -fresh
     	ask the model again and refresh the stored answers (the cache is otherwise used)
+  -image value
+    	attach a PNG/JPEG to the input (repeat); in a batch, to every input. Profiles of type typesafe and openai take images
+  -images string
+    	batch over images: a folder, a glob or a file listing paths; one input per image (PNG/JPEG), with --in as its text
   -in string
     	one input: text, a JSON object, @file or - (default: stdin)
   -json
@@ -77,6 +81,8 @@ Output lines are sorted by question name, not by the order you gave them.
 - stdin (the default), or `--in "text"`, `--in @file`, `--in '{"json": "object"}'`, `--in -`.
 - `--lines FILE` (or `-`): a batch, one input per line of text.
 - `--states FILE.jsonl` (or `-`): a batch, one JSON object or string per line. A JSON input keeps its shape; context is merged into its `"context"` field.
+- `--image FILE` (repeat): a PNG or JPEG sent with the input; in a `--lines` / `--states` batch, with every input.
+- `--images DIR|GLOB|FILE`: a batch, one input per image, with `--in` as the text they all share. See [Images and profile types](/jevx/guides/images/).
 
 ## Output for one input
 

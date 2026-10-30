@@ -63,18 +63,23 @@ func normState(s string) (string, error) {
 	return string(b), nil
 }
 
-// askChunks asks every question about one state, in chunks the server accepts; the model name comes from the reply.
-func askChunks(p core.Profile, state string, qs map[string]core.Question, set core.Settings) (map[string]core.Answer, any, error) {
+// askChunks asks every question about one state (and its images), in chunks the server accepts; the model name comes
+// from the reply.
+func askChunks(p core.Profile, state string, imgs []core.Image, qs map[string]core.Question, set core.Settings) (map[string]core.Answer, any, error) {
 	out, model := map[string]core.Answer{}, any(nil)
 	ttl := time.Duration(*set.CacheTTLDays) * 24 * time.Hour
 	dir, hashes := "", map[string]string{}
 	if *set.Cache {
 		dir = cacheDir
 	}
+	keyState := state
+	if d := core.ImageDigest(imgs); d != "" { // the images' bytes decide the answer too
+		keyState += "\x00images:" + d
+	}
 	var miss []string
 	hit := map[string]any{}
 	for _, k := range keys(qs) {
-		hashes[k] = core.CacheKey(p, state, qs[k].Wire())
+		hashes[k] = core.CacheKey(p, keyState, qs[k].Wire())
 		if a, m, ok := core.CacheGet(dir, hashes[k], ttl); ok {
 			out[k], model, hit[k] = a, m, qs[k].Wire()
 			continue
@@ -89,7 +94,7 @@ func askChunks(p core.Profile, state string, qs map[string]core.Question, set co
 		for _, k := range miss[i:min(i+*set.Chunk, len(miss))] {
 			part[k] = qs[k].Wire()
 		}
-		ans, raw, err := core.AskRaw(p, state, part, time.Duration(*set.TimeoutS)*time.Second)
+		ans, raw, err := core.AskImages(p, state, imgs, part, time.Duration(*set.TimeoutS)*time.Second)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -271,7 +276,9 @@ func cmdAsk(args []string) {
 	memK := fs.Int("memory-k", 3, "with --memory: BM25 sections after named and pinned pages")
 	memBudget := fs.Int("memory-budget", 2000, "with --memory: characters of notes")
 	memStrict := fs.Bool("memory-strict", false, "with --memory: a number, code span or name in the input that the retrieved notes lack makes a yes/no answer no")
-	var nouls, choices, scores, ctxs multi
+	imgSrc := fs.String("images", "", "batch over images: a folder, a glob or a file listing paths; one input per image (PNG/JPEG), with --in as its text")
+	var nouls, choices, scores, ctxs, imgFiles multi
+	fs.Var(&imgFiles, "image", "attach a PNG/JPEG to the input (repeat); in a batch, to every input. Profiles of type typesafe and openai take images")
 	fs.Var(&ctxs, "context", "background for this call: TEXT or @file (repeat); added after the ## Jev sections")
 	fs.BoolVar(&core.NoContext, "no-context", false, "skip the ## Jev sections of the global and folder agent files")
 	fs.Var(&nouls, "noul", `NAME="QUESTION" (repeat); or NAME="QUESTION|true means|false means"`)
@@ -342,7 +349,34 @@ func cmdAsk(args []string) {
 		}
 	}
 	if len(qs) == 0 {
-		die("usage: jevx ask NAME[,NAME...] | --noul NAME=\"QUESTION\" ...  [--in X | --lines FILE | --states FILE.jsonl | < stdin]\n  named questions: jevx question list")
+		die("usage: jevx ask NAME[,NAME...] | --noul NAME=\"QUESTION\" ...  [--in X | --lines FILE | --states FILE.jsonl | --images DIR|GLOB | < stdin] [--image FILE]\n  named questions: jevx question list")
+	}
+	if (len(imgFiles) > 0 || *imgSrc != "") && !p.TakesImages() {
+		die("profile %s is type %s, which does not take images. Use a profile of type typesafe or openai (jevx profile types), or set \"images\": true on this one if its model does", name, p.Kind())
+	}
+	shared, err := core.LoadImages(imgFiles)
+	if err != nil {
+		die("--image %v", err)
+	}
+
+	// A batch over images: one input per image file, all with the same text (--in, else none).
+	if *imgSrc != "" {
+		if *lines != "" || *states != "" {
+			die("--images is its own batch: use it without --lines / --states (to attach one image to every line, use --image)")
+		}
+		files, err := core.ImageFiles(*imgSrc)
+		if err != nil {
+			die("--images %v", err)
+		}
+		txt := ""
+		if *in != "" {
+			txt = text(*in)
+		}
+		inputs, nums, per := make([]string, len(files)), make([]int, len(files)), make([][]string, len(files))
+		for i, f := range files {
+			inputs[i], nums[i], per[i] = txt, i+1, []string{f}
+		}
+		os.Exit(batch(cfg, p, qs, set, inputs, nums, callCtx(ctxs), mem, shared, per))
 	}
 
 	// A batch: --lines or --states.
@@ -365,7 +399,7 @@ func cmdAsk(args []string) {
 			}
 			inputs, nums = append(inputs, l), append(nums, i+1)
 		}
-		os.Exit(batch(cfg, p, qs, set, inputs, nums, callCtx(ctxs), mem))
+		os.Exit(batch(cfg, p, qs, set, inputs, nums, callCtx(ctxs), mem, shared, nil))
 	}
 
 	// One input.
@@ -378,7 +412,8 @@ func cmdAsk(args []string) {
 		die("input: %v", err)
 	}
 	state, hits, diff := mem.apply(state)
-	ans, model, err := askChunks(p, cfg.WithContext(p, state, callCtx(ctxs)...), qs, set)
+	state = core.WithImageRefs(p, state, shared)
+	ans, model, err := askChunks(p, cfg.WithContext(p, state, callCtx(ctxs)...), shared, qs, set)
 	if errors.Is(err, core.ErrNeedKey) {
 		die("%s", core.NeedKeyHelp(name, p))
 	}
@@ -423,11 +458,13 @@ func cmdAsk(args []string) {
 }
 
 // batch asks every question of every input, set.Parallel at a time, and prints a readable table (--raw: one JSONL line per input) in input
-// order. A failed input prints its error and the rest go on; it returns 4 if any failed.
-func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set core.Settings, inputs []string, nums []int, extra []string, mem *memAsk) int {
+// order. A failed input prints its error and the rest go on; it returns 4 if any failed. shared images go with every
+// input; per[i] (when given) are input i's own image files, and the input is then shown by its image path.
+func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set core.Settings, inputs []string, nums []int, extra []string, mem *memAsk, shared []core.Image, per [][]string) int {
 	type row struct {
 		Line    int            `json:"line"`
 		Input   string         `json:"input"`
+		Images  []string       `json:"images,omitempty"`
 		Answers map[string]any `json:"answers,omitempty"`
 		Memory  []core.MemHit  `json:"memory,omitempty"`
 		Diff    []string       `json:"memory_diff,omitempty"`
@@ -442,11 +479,25 @@ func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set cor
 		go func() {
 			defer func() { <-sem; wg.Done() }()
 			rows[i] = row{Line: nums[i], Input: trunc(l, 120)}
-			state, err := normState(l)
+			imgs := shared
+			for _, im := range shared {
+				rows[i].Images = append(rows[i].Images, im.Path)
+			}
+			var err error
+			if per != nil {
+				var own []core.Image
+				own, err = core.LoadImages(append(imagePaths(shared), per[i]...))
+				imgs, rows[i].Images = own, append(rows[i].Images, per[i]...)
+			}
+			state := ""
+			if err == nil {
+				state, err = normState(l)
+			}
 			var ans map[string]core.Answer
 			if err == nil {
 				state, rows[i].Memory, rows[i].Diff = mem.apply(state)
-				ans, _, err = askChunks(p, cfg.WithContext(p, state, extra...), qs, set)
+				state = core.WithImageRefs(p, state, imgs)
+				ans, _, err = askChunks(p, cfg.WithContext(p, state, extra...), imgs, qs, set)
 			}
 			if errors.Is(err, core.ErrNeedKey) {
 				err = errors.New(core.NeedKeyHelp("", p))
@@ -462,6 +513,12 @@ func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set cor
 		}()
 	}
 	wg.Wait()
+	if per != nil { // an image batch is shown by its image file
+		inputs = make([]string, len(per))
+		for i := range per {
+			inputs[i] = strings.Join(per[i], ",")
+		}
+	}
 	code := 0
 	for _, r := range rows {
 		if r.Error != "" {
@@ -527,6 +584,15 @@ func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set cor
 		pr("%s", b)
 	}
 	return code
+}
+
+// imagePaths are the files the images came from.
+func imagePaths(imgs []core.Image) []string {
+	var out []string
+	for _, im := range imgs {
+		out = append(out, im.Path)
+	}
+	return out
 }
 
 // callCtx reads each --context value (TEXT or @file).
@@ -713,6 +779,9 @@ func cmdDefaults(args []string) {
 			if _, ok := om[k]; ok {
 				src = map[bool]string{true: "profile " + prof, false: "config"}[prof != ""]
 			}
+			if t, ok := core.LookupType(p.Kind()); ok && src == "default" && k == "chunk" && t.Chunk > 0 && prof != "" {
+				src = "type " + t.Name
+			}
 			pr("%-16s %-8v %s", k, em[k], src)
 		}
 		return
@@ -800,7 +869,8 @@ func cmdContext(args []string) {
 // Input: stdin, --in, --lines or --states, as for ask. filter / rank read lines from stdin when none is given.
 func cmdVerb(verb string, args []string) {
 	valued := map[string]bool{"in": true, "lines": true, "states": true, "questions": true, "profile": true, "yes": true,
-		"no": true, "min": true, "parallel": true, "context": true, "top": true, "memory": true, "memory-k": true, "memory-budget": true}
+		"no": true, "min": true, "parallel": true, "context": true, "top": true, "memory": true, "memory-k": true, "memory-budget": true,
+		"image": true, "images": true}
 	var pos, flags []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -859,7 +929,7 @@ func cmdVerb(verb string, args []string) {
 		if outMode == "" {
 			outMode = verb
 		}
-		if !has("lines", "states", "in") {
+		if !has("lines", "states", "in", "images") {
 			flags = append(flags, "--lines", "-")
 		}
 	}

@@ -9,6 +9,8 @@ usage: jevx ask|is|pick|filter|rank|question|memory|context|defaults|cache|judge
   jevx COMMAND -h for flags; jevx skill for the full guide; https://muthuishere.github.io/jevx/
 ```
 
+`jevx help` goes on with every command grouped by what it is for, the input and batch flags, and the topics below. `jevx help profiles` lists the profile types with their request shapes and image support, `jevx help images` shows how images are sent per type, `jevx help batch` covers `--lines`, `--states` and `--images`.
+
 Subcommands that use Go's flag parser (`ask`, `judge`, `install`, `uninstall`, `stats`) print full help on `-h`. The others print a one-line usage and exit `4`; those lines are quoted below.
 
 ## Asking
@@ -37,12 +39,12 @@ jevx: usage: jevx rank "QUESTION"|NAME ...  (see: jevx help)
 | `defaults [show]\|set\|unset` | every setting, its value and where it comes from | [Settings](/jevx/reference/settings/) |
 | `memory add\|index\|check\|show\|list` | a folder of cited markdown notes for `ask --memory`: register, index, check freshness, preview retrieval | [Memory](/jevx/guides/memory/) |
 | `cache [stat]\|enable\|disable\|ttl DAYS\|dir [PATH]\|clear` | the answer cache: status, switch it on or off, set how long answers live, move it, or delete everything (also `config cache …`) | [Privacy](/jevx/reference/privacy/#the-answer-cache) |
-| `profile list\|add\|use\|remove\|show` | endpoints | [Settings](/jevx/reference/settings/#profiles) |
+| `profile list\|types\|add\|use\|remove\|show` | endpoints and the API each speaks (`--type typesafe\|cloudflare\|openai`) | [Images and profile types](/jevx/guides/images/) |
 
 ```text title="usage lines"
 jevx: usage: jevx question add NAME --noul "QUESTION" | --choice "QUESTION|k=desc;k2=desc" | --score "QUESTION|low;mid;high" [--yes 0.85 --no 0.15 --min 0.6]
 jevx: usage: jevx defaults [show] | set KEY VALUE | unset KEY  [--profile P]   keys: yes, no, min_confidence, parallel, retries, timeout_s, chunk, ledger, accept_min, more_max, cache, cache_ttl_days
-jevx: usage: jevx profile add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE]
+jevx: usage: jevx profile add NAME URL [--type typesafe|cloudflare|openai] [--model M] [--header 'K: V' ...] [--questions FILE]
 ```
 
 ## Hooks and plugins
@@ -68,4 +70,4 @@ jevx: usage: jevx hook run EVENT | status | review [N] | enable|disable stop  (p
 
 ## Global flags
 
-Every command takes `--cwd DIR` to run as if from that directory. The asking commands take `--profile`, `--yes`, `--no`, `--min`, `--parallel`, `--context TEXT|@file` and `--no-context`. `ask` and the shortcuts also take `--fresh`: skip the answer cache and refresh what it holds. `ask` takes `--memory NAME`, `--memory-k`, `--memory-budget` and `--memory-strict` ([Memory](/jevx/guides/memory/)).
+Every command takes `--cwd DIR` to run as if from that directory. The asking commands take `--profile`, `--yes`, `--no`, `--min`, `--parallel`, `--context TEXT|@file` and `--no-context`. `ask` and the shortcuts also take `--fresh`: skip the answer cache and refresh what it holds. `ask` and the shortcuts take `--image FILE` and `--images DIR|GLOB` ([Images](/jevx/guides/images/)). `ask` takes `--memory NAME`, `--memory-k`, `--memory-budget` and `--memory-strict` ([Memory](/jevx/guides/memory/)).

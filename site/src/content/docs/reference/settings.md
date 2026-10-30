@@ -55,11 +55,13 @@ built-in < config < profile < the question's own thresholds (`question add --yes
 
 ## Profiles
 
-A profile is `url`, `model`, `headers`, and optionally `questions` (a question pack for `judge`). `$VAR` / `${VAR}` in any field is expanded from the environment when the request is made and never written back; a missing variable fails with its name, exit `4`. Legacy `endpoint` / `key_env` fields are still read.
+A profile is `url`, `model`, `headers`, its `type` (the API it speaks: `typesafe`, the default, `cloudflare` or `openai`; `jevx profile types` lists them), and optionally `images` (override whether images may be sent) and `questions` (a question pack for `judge`). The type also sets a default: an `openai` profile sends at most 10 questions per request (`chunk`), below the config defaults. See [Images and profile types](/jevx/guides/images/). `$VAR` / `${VAR}` in any field is expanded from the environment when the request is made and never written back; a missing variable fails with its name, exit `4`. Legacy `endpoint` / `key_env` fields are still read.
 
 ```bash title="Terminal"
 jevx profile add hosted https://example.com/v1/systemone --model some-model --header "Authorization: Bearer $JEV_API_KEY"
 jevx profile add local 'http://$JEV_HOST/v1/systemone' --model my-model
+jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
+jevx profile types
 jevx profile use local
 jevx profile list
 jevx profile show local
@@ -68,7 +70,7 @@ jevx profile remove hosted
 
 ```console
 $ jevx profile add -h
-jevx: usage: jevx profile add NAME URL [--model M] [--header 'K: V' ...] [--questions FILE]
+jevx: usage: jevx profile add NAME URL [--type typesafe|cloudflare|openai] [--model M] [--header 'K: V' ...] [--questions FILE]
 ```
 
 ## Files and environment
