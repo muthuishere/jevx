@@ -19,7 +19,8 @@ import (
 // before a hosted call, the answer cache, verdicts and the ledger.
 
 // noKeyEnv switches off toolnexus's API-key variable: jevx sends credentials only through a profile's headers, so a
-// key is never sent to a profile that did not name it.
+// key is never sent to a profile that did not name it. toolnexus v0.26.0 would otherwise send TYPESAFE_API_KEY to a
+// custom or overridden endpoint (muthuishere/toolnexus#155).
 const noKeyEnv = "JEVX_NO_KEY_ENV"
 
 // Options is the toolnexus ClassifierOptions profile p resolves to. p is normalised but not expanded: toolnexus

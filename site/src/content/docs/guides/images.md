@@ -25,7 +25,7 @@ jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx  
 jevx profile list
 ```
 
-A profile with its own url gets no key header unless you give one (`--header 'Authorization: Bearer $VAR'`), so a key never reaches a host you did not name. A url containing `/ai/run`, `openrouter.ai` or `ai-gateway.vercel.sh` sets the type when `--type` is left out. The older `style` field and `--style` flag still work. A System One url is given in full (`.../v1/systemone`): toolnexus posts to its base plus `/systemone`.
+A profile with its own url gets no key header unless you give one (`--header 'Authorization: Bearer $VAR'`), so a key never reaches a host you did not name. A url containing `/ai/run`, `openrouter.ai` or `ai-gateway.vercel.sh` sets the type when `--type` is left out. The older `style` field and `--style` flag still work. There is no `openai` type yet: OpenAI's Decisions API needs a second wire in toolnexus ([toolnexus#157](https://github.com/muthuishere/toolnexus/issues/157)). A failed Cloudflare envelope currently reports only "envelope not successful", without Cloudflare's own message such as a missing AI Gateway balance ([toolnexus#156](https://github.com/muthuishere/toolnexus/issues/156)). A System One url is given in full (`.../v1/systemone`): toolnexus posts to its base plus `/systemone`.
 
 ## Images
 
