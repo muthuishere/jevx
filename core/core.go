@@ -766,6 +766,7 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 
 // AskImages is AskRaw with images: sent as System One assets (typesafe, cloudflare) or input_image parts (openai).
 // The state must already name them (WithImageRefs). A profile that does not take images is refused before any call.
+// The request goes through a toolnexus Classifier (backend.go); jevx keeps redaction, validation and the ledger.
 func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout time.Duration) (map[string]Answer, []byte, error) {
 	kind := p.Kind()
 	if len(imgs) > 0 && !p.TakesImages() {
@@ -774,6 +775,7 @@ func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout
 	if MissingEnv(p.Norm()) != "" {
 		return nil, nil, ErrNeedKey
 	}
+	headers := p.Norm().Headers // toolnexus expands $VARs itself, at call time; expanding twice would mangle a "$" in a value
 	p = p.Expanded()
 	// Before any HOSTED call, scrub secrets, emails and phones from the state and question text (CEO 2026-10-03).
 	redacted := 0
@@ -786,85 +788,8 @@ func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout
 		}
 		NoteRedacted(kinds)
 	}
-	core := map[string]any{"state": sendState, "questions": sendQs}
-	if len(imgs) > 0 && kind != TypeOpenAI {
-		assets := map[string]any{}
-		for _, im := range imgs {
-			assets[im.Name] = im.asset()
-		}
-		core["assets"] = assets
-		if kind == TypeTypeSafe { // TypeSafe's opt-in for image input; a header the profile sets itself wins
-			h := map[string]string{ImagesHeader: "true"}
-			for k, v := range p.Headers {
-				h[k] = v
-			}
-			p.Headers = h
-		}
-	}
-	// Cloudflare's universal /ai/run is an envelope: {"model": ..., "input": {...}} with a
-	// {"result": ..., "success": ...} reply (Cloudflare REST 2026-10). OpenAI's Decisions API takes
-	// {"model", "input", "questions": [...]} and answers with a list. System One is the default.
-	isCF := kind == TypeCloudflare
-	var body []byte
-	switch kind {
-	case TypeCloudflare:
-		body, _ = json.Marshal(map[string]any{"model": p.Model, "input": core})
-	case TypeOpenAI:
-		body, _ = json.Marshal(map[string]any{"model": p.Model, "input": openaiInput(sendState, imgs), "questions": openaiQuestions(sendQs)})
-	default:
-		core["model"] = p.Model
-		body, _ = json.Marshal(core)
-	}
 	t0 := time.Now()
-	var raw []byte
-	var err error
-	for try := 0; try < max(1, Retries); try++ {
-		if try > 0 {
-			time.Sleep(time.Duration(try*try) * 500 * time.Millisecond)
-		}
-		var retry bool
-		raw, retry, err = post(p, body, timeout)
-		if err == nil || !retry {
-			break
-		}
-	}
-	if isCF && err == nil {
-		var env struct {
-			Result  json.RawMessage `json:"result"`
-			Success bool            `json:"success"`
-			Errors  []struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			} `json:"errors"`
-		}
-		if e := json.Unmarshal(raw, &env); e != nil || !env.Success {
-			msg := "cloudflare envelope: unknown error"
-			if e == nil && len(env.Errors) > 0 {
-				msg = env.Errors[0].Message
-			} else if e == nil {
-				msg = strings.TrimSpace(string(raw[:min(200, len(raw))]))
-			}
-			err = fmt.Errorf("%s: %s", p.URL, msg)
-		} else {
-			raw = env.Result
-			// The Workers AI /ai/run reply nests once more: {"state": "Completed", "result": {model, answers}}.
-			// Any other state (queued, running, failed) is not an answer; say so instead of reading it as one.
-			var inner struct {
-				State  string          `json:"state"`
-				Result json.RawMessage `json:"result"`
-			}
-			if json.Unmarshal(raw, &inner) == nil && inner.State != "" {
-				if inner.State != "Completed" {
-					err = fmt.Errorf("%s: cloudflare run state %q, not Completed", p.URL, inner.State)
-				} else {
-					raw = inner.Result
-				}
-			}
-		}
-	}
-	if kind == TypeOpenAI && err == nil {
-		raw, err = openaiAnswers(raw, qs)
-	}
+	raw, err := evaluate(p, headers, kind, sendState, imgs, qs, sendQs, timeout)
 	var out struct {
 		Model   string            `json:"model"`
 		Answers map[string]Answer `json:"answers"`
