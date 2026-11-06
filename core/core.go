@@ -74,17 +74,19 @@ func expand(p string) string {
 // Profile is one endpoint: url, model and request headers. Secrets are never stored: a header value names an env var
 // ("Bearer $JEV_API_KEY") that is expanded only when a request is sent.
 type Profile struct {
-	URL       string            `json:"url"`
-	Model     string            `json:"model"`
-	Type      string            `json:"type,omitempty"`      // the API it speaks: typesafe (System One, the default) | cloudflare | openai (jevx profile types)
-	Images    *bool             `json:"images,omitempty"`    // whether images may be sent; unset: the type's default
-	Style     string            `json:"style,omitempty"`     // legacy name for type (typesafe | cloudflare)
-	Headers   map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
-	Questions string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
-	Note      string            `json:"note,omitempty"`
-	Endpoint  string            `json:"endpoint,omitempty"` // legacy name for url
-	KeyEnv    string            `json:"key_env,omitempty"`  // legacy: same as headers {"Authorization": "Bearer $KEY_ENV"}
-	Defaults  Settings          `json:"defaults,omitempty"` // overrides the global defaults for this profile
+	URL           string            `json:"url"`
+	Model         string            `json:"model"`
+	Type          string            `json:"type,omitempty"`      // the API it speaks: typesafe (System One, the default) | cloudflare | openai (jevx profile types)
+	Images        *bool             `json:"images,omitempty"`    // whether images may be sent; unset: the type's default
+	Style         string            `json:"style,omitempty"`     // legacy name for type (typesafe | cloudflare)
+	Batch         int               `json:"batch,omitempty"`     // native batch: states per POST {url}/batch (typesafe only; 0 = one request per input)
+	BatchEndpoint string            `json:"batch_url,omitempty"` // where native batches go; default url + "/batch"
+	Headers       map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
+	Questions     string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
+	Note          string            `json:"note,omitempty"`
+	Endpoint      string            `json:"endpoint,omitempty"` // legacy name for url
+	KeyEnv        string            `json:"key_env,omitempty"`  // legacy: same as headers {"Authorization": "Bearer $KEY_ENV"}
+	Defaults      Settings          `json:"defaults,omitempty"` // overrides the global defaults for this profile
 }
 
 // Settings are every tunable knob. Unset fields fall back: flag > profile defaults > config defaults > Builtin.
@@ -870,6 +872,11 @@ func validate(qs map[string]any, ans map[string]Answer) error {
 // redacted, how many images were sent, error.
 // Never the state, the question text or a header. JEVX_LEDGER=off disables it.
 func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted, images int) {
+	ledgerBatch(p, qs, model, usage, d, err, redacted, images, 0)
+}
+
+// ledgerBatch is ledger for a native batch: states is how many inputs the one call carried (0: not a batch).
+func ledgerBatch(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted, images, states int) {
 	if !LedgerOn || firstEnv("JEVX_LEDGER", "JEVCLI_LEDGER") == "off" {
 		return
 	}
@@ -884,6 +891,9 @@ func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d 
 		"profile": ActiveProfile, "caller": Caller(), "hosted": Hosted(p), "redacted": redacted, "type": p.Kind()}
 	if images > 0 {
 		row["images"] = images
+	}
+	if states > 0 {
+		row["states"] = states
 	}
 	if err != nil {
 		row["error"] = trimErr(err.Error())

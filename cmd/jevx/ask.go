@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/tabwriter"
 	"time"
 
@@ -471,44 +472,80 @@ func batch(cfg core.Config, p core.Profile, qs map[string]core.Question, set cor
 		Error   string         `json:"error,omitempty"`
 	}
 	rows := make([]row, len(inputs))
+	// prepare builds input i's state (memory, image names, context) and loads its images.
+	prepare := func(i int) (string, []core.Image, error) {
+		rows[i] = row{Line: nums[i], Input: trunc(inputs[i], 120)}
+		imgs := shared
+		for _, im := range shared {
+			rows[i].Images = append(rows[i].Images, im.Path)
+		}
+		if per != nil {
+			own, err := core.LoadImages(append(imagePaths(shared), per[i]...))
+			imgs, rows[i].Images = own, append(rows[i].Images, per[i]...)
+			if err != nil {
+				return "", nil, err
+			}
+		}
+		state, err := normState(inputs[i])
+		if err != nil {
+			return "", nil, err
+		}
+		state, rows[i].Memory, rows[i].Diff = mem.apply(state)
+		state = core.WithImageRefs(p, state, imgs)
+		return cfg.WithContext(p, state, extra...), imgs, nil
+	}
+	finish := func(i int, ans map[string]core.Answer, err error) {
+		if errors.Is(err, core.ErrNeedKey) {
+			err = errors.New(core.NeedKeyHelp("", p))
+		}
+		if err != nil {
+			rows[i].Error = err.Error()
+			return
+		}
+		rows[i].Answers = map[string]any{}
+		for k, a := range ans {
+			rows[i].Answers[k] = map[string]any{"verdict": mem.strictVerdict(qs[k], verdict(qs[k], a, set), rows[i].Diff), "p": round2(value(a)), "answer": a}
+		}
+	}
+	// A unit of work is one input, or a group of up to batch inputs when the profile batches natively.
+	size := p.BatchSize()
+	if len(qs) > *set.Chunk {
+		size = 0 // the questions need several requests per input: no native batch
+	}
+	var groups [][]int
+	for i := range inputs {
+		if size > 1 && len(groups) > 0 && len(groups[len(groups)-1]) < size {
+			groups[len(groups)-1] = append(groups[len(groups)-1], i)
+			continue
+		}
+		groups = append(groups, []int{i})
+	}
 	sem := make(chan struct{}, max(1, *set.Parallel))
 	var wg sync.WaitGroup
-	for i, l := range inputs {
+	for _, g := range groups {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func() {
 			defer func() { <-sem; wg.Done() }()
-			rows[i] = row{Line: nums[i], Input: trunc(l, 120)}
-			imgs := shared
-			for _, im := range shared {
-				rows[i].Images = append(rows[i].Images, im.Path)
+			states, imgs, idx := []string{}, [][]core.Image{}, []int{}
+			for _, i := range g {
+				state, im, err := prepare(i)
+				if err != nil {
+					finish(i, nil, err)
+					continue
+				}
+				states, imgs, idx = append(states, state), append(imgs, im), append(idx, i)
 			}
-			var err error
-			if per != nil {
-				var own []core.Image
-				own, err = core.LoadImages(append(imagePaths(shared), per[i]...))
-				imgs, rows[i].Images = own, append(rows[i].Images, per[i]...)
-			}
-			state := ""
-			if err == nil {
-				state, err = normState(l)
-			}
-			var ans map[string]core.Answer
-			if err == nil {
-				state, rows[i].Memory, rows[i].Diff = mem.apply(state)
-				state = core.WithImageRefs(p, state, imgs)
-				ans, _, err = askChunks(p, cfg.WithContext(p, state, extra...), imgs, qs, set)
-			}
-			if errors.Is(err, core.ErrNeedKey) {
-				err = errors.New(core.NeedKeyHelp("", p))
-			}
-			if err != nil {
-				rows[i].Error = err.Error()
+			if len(g) == 1 {
+				if len(idx) == 1 {
+					ans, _, err := askChunks(p, states[0], imgs[0], qs, set)
+					finish(idx[0], ans, err)
+				}
 				return
 			}
-			rows[i].Answers = map[string]any{}
-			for k, a := range ans {
-				rows[i].Answers[k] = map[string]any{"verdict": mem.strictVerdict(qs[k], verdict(qs[k], a, set), rows[i].Diff), "p": round2(value(a)), "answer": a}
+			answers, errs := askMany(p, states, imgs, qs, set)
+			for j, i := range idx {
+				finish(i, answers[j], errs[j])
 			}
 		}()
 	}
@@ -593,6 +630,90 @@ func imagePaths(imgs []core.Image) []string {
 		out = append(out, im.Path)
 	}
 	return out
+}
+
+// noNative is set once a profile's endpoint answers that it has no native batch route; the rest of the run asks
+// one input at a time.
+var (
+	noNative     atomic.Bool
+	noNativeNote sync.Once
+)
+
+// askMany asks every question about several states, from the cache where it can and in ONE native batch request
+// for the rest (core.AskBatch). Without a batch route it falls back to one request per state.
+func askMany(p core.Profile, states []string, imgs [][]core.Image, qs map[string]core.Question, set core.Settings) ([]map[string]core.Answer, []error) {
+	out, errs := make([]map[string]core.Answer, len(states)), make([]error, len(states))
+	one := func(j int) { out[j], _, errs[j] = askChunks(p, states[j], imgs[j], qs, set) }
+	ttl := time.Duration(*set.CacheTTLDays) * 24 * time.Hour
+	dir := ""
+	if *set.Cache {
+		dir = cacheDir
+	}
+	names := keys(qs)
+	wire := map[string]any{}
+	for _, k := range names {
+		wire[k] = qs[k].Wire()
+	}
+	hashes := make([]map[string]string, len(states))
+	var miss []int
+	for j, st := range states {
+		keyState := st
+		if d := core.ImageDigest(imgs[j]); d != "" {
+			keyState += "\x00images:" + d
+		}
+		hashes[j], out[j] = map[string]string{}, map[string]core.Answer{}
+		hit := map[string]any{}
+		for _, k := range names {
+			hashes[j][k] = core.CacheKey(p, keyState, wire[k].(map[string]any))
+			if a, _, ok := core.CacheGet(dir, hashes[j][k], ttl); ok {
+				out[j][k], hit[k] = a, wire[k]
+			}
+		}
+		if len(hit) > 0 {
+			core.NoteRedacted(core.Redactions(p, st, hit))
+		}
+		if len(out[j]) < len(names) {
+			miss = append(miss, j)
+		}
+	}
+	if len(miss) == 0 {
+		return out, errs
+	}
+	if noNative.Load() {
+		for _, j := range miss {
+			one(j)
+		}
+		return out, errs
+	}
+	ms, mi := make([]string, len(miss)), make([][]core.Image, len(miss))
+	for x, j := range miss {
+		ms[x], mi[x] = states[j], imgs[j]
+	}
+	res, err := core.AskBatch(p, ms, mi, wire, time.Duration(*set.TimeoutS)*time.Second)
+	if errors.Is(err, core.ErrNoBatch) {
+		noNative.Store(true)
+		noNativeNote.Do(func() {
+			fmt.Fprintf(os.Stderr, "jevx: %s has no native batch route; asking one input at a time (remove \"batch\" from the profile to skip this check)\n", p.BatchURL())
+		})
+		for _, j := range miss {
+			one(j)
+		}
+		return out, errs
+	}
+	for x, j := range miss {
+		switch {
+		case err != nil:
+			errs[j] = err
+		case res[x].Err != nil:
+			errs[j] = res[x].Err
+		default:
+			for k, a := range res[x].Answers {
+				out[j][k] = a
+				core.CachePut(dir, hashes[j][k], a, res[x].Model)
+			}
+		}
+	}
+	return out, errs
 }
 
 // callCtx reads each --context value (TEXT or @file).

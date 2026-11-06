@@ -627,6 +627,9 @@ func cmdProfile(args []string) {
 			if p.TakesImages() {
 				img = "  images"
 			}
+			if n := p.BatchSize(); n > 0 {
+				img += fmt.Sprintf("  batch=%d", n)
+			}
 			pr("%s %-10s %-10s %s  model=%s%s%s%s", mark, n, p.Kind(), p.URL, p.Model, img, hs, note)
 		}
 		pr("(* = default; change with: jevx profile use NAME; the types: jevx profile types)")
@@ -655,6 +658,8 @@ func cmdProfile(args []string) {
 		m, q := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON")
 		st := fs.String("type", "", "the API the endpoint speaks: "+core.TypeNames()+" (default typesafe; jevx profile types)")
 		fs.StringVar(st, "style", "", "legacy name for --type")
+		nb := fs.Int("batch", 0, "native batch: send up to N inputs per request to the server's batch route (typesafe only; max 50)")
+		bu := fs.String("batch-url", "", "the batch route (default: URL + /batch)")
 		imgOn, imgOff := fs.Bool("images", false, "this endpoint takes images even if its type does not by default"), fs.Bool("no-images", false, "never send images to this endpoint")
 		var hdr multi
 		fs.Var(&hdr, "header", `request header "Name: value" (repeat); reference env vars for secrets: "Authorization: Bearer $JEV_API_KEY"`)
@@ -673,7 +678,13 @@ func cmdProfile(args []string) {
 		if _, ok := core.LookupType(*st); !ok {
 			die("--type: want one of %s, got %q (jevx profile types)", core.TypeNames(), *st)
 		}
-		np := core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Type: *st}
+		np := core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Type: *st, Batch: *nb, BatchEndpoint: *bu}
+		if *nb > 0 && *st != core.TypeTypeSafe {
+			die("--batch: only a typesafe profile has a native batch route; %s profiles ask one input per request", *st)
+		}
+		if *nb > core.MaxBatch {
+			die("--batch: at most %d inputs per request", core.MaxBatch)
+		}
 		switch {
 		case *imgOn && *imgOff:
 			die("give --images or --no-images, not both")

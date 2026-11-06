@@ -67,3 +67,35 @@ func TestBackendLimits(t *testing.T) {
 		t.Fatalf("a one-level score: err %v, %d calls", err, n.Load())
 	}
 }
+
+// One state's error or invalid answer in a native batch fails only that state; a reply with the wrong number of
+// results fails the request; a missing route is ErrNoBatch.
+func TestAskBatchPerStateErrors(t *testing.T) {
+	reply, status := "", 200
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/systemone/batch" {
+			t.Errorf("path %s", r.URL.Path)
+		}
+		w.WriteHeader(status)
+		io.WriteString(w, reply)
+	}))
+	defer s.Close()
+	qs := map[string]any{"a": map[string]any{"type": "noul", "instructions": "q"}}
+	p := Profile{URL: s.URL + "/v1/systemone", Model: "m", Batch: 8}
+	reply = `{"model":"m","results":[{"answers":{"a":{"type":"noul","noul":0.9}}},{"error":"state too long"},{"answers":{}}]}`
+	res, err := AskBatch(p, []string{"x", "y", "z"}, nil, qs, 5*time.Second)
+	if err != nil || res[0].Err != nil || res[0].Answers["a"].P() != 0.9 || res[0].Model != "m" ||
+		res[1].Err == nil || !strings.Contains(res[1].Err.Error(), "state too long") || res[2].Err == nil {
+		t.Fatalf("%v %+v", err, res)
+	}
+	if _, err := AskBatch(p, []string{"x"}, nil, qs, 5*time.Second); err == nil || !strings.Contains(err.Error(), "3 results for 1 states") {
+		t.Fatalf("count mismatch: %v", err)
+	}
+	status = 404
+	if _, err := AskBatch(p, []string{"x"}, nil, qs, 5*time.Second); err != ErrNoBatch {
+		t.Fatalf("want ErrNoBatch, got %v", err)
+	}
+	if (Profile{Batch: 8, Type: TypeOpenAI}).BatchSize() != 0 || (Profile{Batch: 99}).BatchSize() != MaxBatch {
+		t.Fatal("BatchSize")
+	}
+}
