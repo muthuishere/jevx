@@ -21,6 +21,7 @@ import (
 	"os"
 
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strings"
 
@@ -513,7 +514,7 @@ func main() {
 	case "stats":
 		cmdStats(a)
 	case "version", "--version", "-v":
-		pr("jevx %s", version)
+		pr("jevx %s (toolnexus %s)", version, toolnexusVersion())
 	case "skill", "cookbook":
 		b, _ := skillFS.ReadFile("skill/SKILL.md")
 		os.Stdout.Write(b)
@@ -524,6 +525,18 @@ func main() {
 	default:
 		die("unknown command %q", os.Args[1])
 	}
+}
+
+// toolnexusVersion is the toolnexus Go module this binary was built with: it sends every request.
+func toolnexusVersion() string {
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		for _, d := range bi.Deps {
+			if d.Path == "github.com/muthuishere/toolnexus/golang" {
+				return d.Version
+			}
+		}
+	}
+	return "unknown"
 }
 
 // cmdHelp is `jevx help [TOPIC]`: an overview of every command, or one topic in depth.
@@ -589,7 +602,10 @@ A failed input prints its error on stderr and the rest go on; the batch exits 4 
   --images DIR|GLOB|FILE  one input per image; --in gives them all the same text
   --image FILE          attach an image to every input of a --lines / --states batch
 filter and rank are batches too. Each request carries up to "chunk" questions (32; 10 for openai profiles).
-Every API is called once per input: none of the three has a batch endpoint, so jevx runs the calls in parallel.`)
+By default each input is one request (through toolnexus), --parallel at a time. A typesafe profile whose server has a
+batch route (openjevx: POST /v1/systemone/batch) can send up to N inputs per request instead:
+  jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx --batch 32
+Without the route jevx says so once and asks one input per request. TypeSafe's hosted API has no batch route.`)
 	default:
 		die("no help topic %q: jevx help [profiles | images | batch]", topic)
 	}

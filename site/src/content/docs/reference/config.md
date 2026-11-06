@@ -61,6 +61,8 @@ An illustrative file with every top-level field (values are examples, not defaul
 | `type` | the API the endpoint speaks: `typesafe` (the flat System One body, the default), `cloudflare` (a `{model, input}` envelope whose `{result, success}` reply is unwrapped; a failed envelope is an error with Cloudflare's message) or `openai` (the OpenAI Decisions API: questions as a list, answers read back by name). Empty means `typesafe`, except that a URL containing `/ai/run` is treated as `cloudflare`. Set it with `jevx profile add NAME URL --type openai`; the older `style` field and `--style` flag are still read. |
 | `images` | `true` / `false`: whether `--image` / `--images` may be sent to this endpoint. Unset: the type decides (typesafe and openai yes, cloudflare no). |
 | `style` | legacy name for `type`. |
+| `batch` | native batch: up to this many inputs per request (at most 50) to the server's batch route; `typesafe` profiles only. Unset: one request per input. See [Native batch](/jevx/guides/ask/#native-batch). |
+| `batch_url` | where native batches go; default `url` + `/batch`. |
 | (Cloudflare) | Cloudflare needs an AI Gateway balance or BYOK (bring your own key) on the account; without one it answers HTTP 402, which jevx reports as an error (exit `4`). |
 | `questions` | optional question pack (JSON) for `judge` |
 | `defaults` | settings that apply only when this profile is used |

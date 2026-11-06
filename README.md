@@ -29,7 +29,10 @@ number or a key, never prose. The agent keeps its reasoning for the real work.
 5. **Repeat calls are free.** Answers are cached on your machine (a hash-keyed file each, never the input), so the same
    call again returns in milliseconds and costs nothing. `--fresh` asks again; `jevx cache enable|disable|clear`.
 6. **Any endpoint, nothing hidden.** Any System One URL works (keys stay in environment variables, expanded only when a
-   request is sent). Replies are validated, 429/5xx are retried, and every call is logged without its content.
+   request is sent), and Cloudflare and OpenAI profiles too. Requests go through
+   [toolnexus](https://github.com/muthuishere/toolnexus)'s System One client; replies are validated, 429/5xx are retried,
+   and every call is logged without its content. A self-hosted server with a batch route (openjevx) takes up to 50 inputs
+   per request with `--batch N`.
 
 ## Jev, for your day-to-day work
 

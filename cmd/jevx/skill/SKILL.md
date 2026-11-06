@@ -71,11 +71,14 @@ jevx ask --images 'shots/*.png' --in "Checkout page" --choice state="Which state
 
 ## Profiles: which API answers
 
+Every request goes through toolnexus's System One client; you never call an endpoint yourself.
+
 Each profile has a `type`: `typesafe` (System One / Jev, the default and the built-in `jev` profile), `cloudflare`
 (Workers AI `/ai/run`) or `openai` (OpenAI Decisions API, `/v1/decisions`). Questions and verdicts are the same for all
 three; jevx converts the request and the reply. `jevx profile list` shows each profile's type and whether it takes
 images; `jevx help profiles` explains the types. Use `--profile NAME` only for a profile the user already set up; do not
-add one unasked.
+add one unasked. A profile listed with `batch=N` sends up to N inputs per request in a batch (openjevx's batch route), so
+a 1000-line `filter` there is ~32 requests, not 1000; otherwise prefer `--lines` / `--images` over a shell loop anyway.
 
 ## Judge against the user's notes: `--memory`
 

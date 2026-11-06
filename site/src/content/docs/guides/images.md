@@ -80,4 +80,4 @@ The output above shows the table's shape; the probabilities are illustrative, no
 
 `--image FILE` with `--lines` or `--states` attaches the same image to every input instead, e.g. one reference design checked against many descriptions.
 
-None of the three APIs has a batch endpoint, so a batch is one request per input, `--parallel N` at a time (default 8), printed in input order. A failed input prints its error on stderr and the rest go on; the batch exits `4` if any failed.
+By default a batch is one request per input, `--parallel N` at a time (default 8), printed in input order. A typesafe profile whose server has a batch route can carry up to N inputs per request instead; see [Native batch](/jevx/guides/ask/#native-batch). A failed input prints its error on stderr and the rest go on; the batch exits `4` if any failed.

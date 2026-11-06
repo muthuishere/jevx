@@ -131,7 +131,24 @@ jevx ask --lines app.log --noul err="Is this line an error or failure?" --raw
 {"line":3,"input":"INFO  09:12:05 cache warmed","answers":{"err":{"answer":{"type":"noul","noul":0.02},"p":0.02,"verdict":"no"}}}
 ```
 
-Batches run `parallel` requests at a time (default 8; `--parallel N` for one call). A batch exits `0`, or `4` if any input failed; that line carries an `"error"` field instead of answers.
+Batches run `parallel` requests at a time (default 8; `--parallel N` for one call).
+
+### Native batch
+
+By default each input is its own request. A System One server with a batch route (openjevx's `POST /v1/systemone/batch`) can take many inputs in one request, which on openjevx means one model run instead of one per input. Turn it on per profile:
+
+```bash title="Terminal"
+jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx --batch 32
+```
+
+`--lines`, `--states`, `--images`, `filter` and `rank` then send up to 32 inputs per request (at most 50) to `URL/batch` (or `--batch-url`), `parallel` requests at a time. Each input is still redacted, cached and checked on its own, and one bad result fails only its row. The wire:
+
+```json
+{"requests": [{"state": "...", "questions": {"err": {"type": "noul", "instructions": "..."}}, "model": "openjevx"}]}
+{"model": "openjevx", "results": [{"model": "openjevx", "answers": {"err": {"type": "noul", "noul": 0.97}}}]}
+```
+
+A server without the route (404, 405 or 501) is told once on stderr and the run goes on one input per request. Only `typesafe` profiles batch natively: TypeSafe's hosted API, Cloudflare and OpenAI have no batch route, and a batch that needs more than `chunk` questions per input also goes one input at a time. A batch exits `0`, or `4` if any input failed; that line carries an `"error"` field instead of answers.
 
 ## Overrides for one call
 
