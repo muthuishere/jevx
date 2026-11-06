@@ -2,7 +2,7 @@ module github.com/muthuishere/jevx
 
 go 1.26.0
 
-require github.com/muthuishere/toolnexus/golang v0.25.0
+require github.com/muthuishere/toolnexus/golang v0.26.0
 
 require (
 	github.com/google/jsonschema-go v0.4.2 // indirect

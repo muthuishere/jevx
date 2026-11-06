@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Through toolnexus, a request goes to the profile's exact URL with exactly the profile's headers: TYPESAFE_API_KEY
+// Through toolnexus, a request goes to the profile's URL with exactly the profile's headers: TYPESAFE_API_KEY
 // never reaches a profile that did not name it, and a "$" inside an expanded value is sent as it is.
 func TestBackendSendsOnlyTheProfileHeadersToItsURL(t *testing.T) {
 	t.Setenv("TYPESAFE_API_KEY", "ts-secret")
@@ -22,11 +22,11 @@ func TestBackendSendsOnlyTheProfileHeadersToItsURL(t *testing.T) {
 	}))
 	defer s.Close()
 	qs := map[string]any{"a": map[string]any{"type": "noul", "instructions": "q"}}
-	p := Profile{URL: s.URL + "/custom/path", Model: "m", Headers: map[string]string{"X-Other": "Bearer $JEVX_TEST_TOKEN"}}
+	p := Profile{URL: s.URL + "/custom/v1/systemone", Model: "m", Headers: map[string]string{"X-Other": "Bearer $JEVX_TEST_TOKEN"}}
 	if _, _, err := AskRaw(p, "x", qs, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
-	if path != "/custom/path" || auth != "" || other != "Bearer a$b" {
+	if path != "/custom/v1/systemone" || auth != "" || other != "Bearer a$b" {
 		t.Fatalf("path %q, Authorization %q, X-Other %q", path, auth, other)
 	}
 }
@@ -65,37 +65,5 @@ func TestBackendLimits(t *testing.T) {
 	qs := map[string]any{"s": map[string]any{"type": "score", "instructions": "q", "criteria": []string{"only"}}}
 	if _, _, err := AskRaw(p, "x", qs, 5*time.Second); err == nil || n.Load() != 0 {
 		t.Fatalf("a one-level score: err %v, %d calls", err, n.Load())
-	}
-}
-
-// One state's error or invalid answer in a native batch fails only that state; a reply with the wrong number of
-// results fails the request; a missing route is ErrNoBatch.
-func TestAskBatchPerStateErrors(t *testing.T) {
-	reply, status := "", 200
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/systemone/batch" {
-			t.Errorf("path %s", r.URL.Path)
-		}
-		w.WriteHeader(status)
-		io.WriteString(w, reply)
-	}))
-	defer s.Close()
-	qs := map[string]any{"a": map[string]any{"type": "noul", "instructions": "q"}}
-	p := Profile{URL: s.URL + "/v1/systemone", Model: "m", Batch: 8}
-	reply = `{"model":"m","results":[{"answers":{"a":{"type":"noul","noul":0.9}}},{"error":"state too long"},{"answers":{}}]}`
-	res, err := AskBatch(p, []string{"x", "y", "z"}, nil, qs, 5*time.Second)
-	if err != nil || res[0].Err != nil || res[0].Answers["a"].P() != 0.9 || res[0].Model != "m" ||
-		res[1].Err == nil || !strings.Contains(res[1].Err.Error(), "state too long") || res[2].Err == nil {
-		t.Fatalf("%v %+v", err, res)
-	}
-	if _, err := AskBatch(p, []string{"x"}, nil, qs, 5*time.Second); err == nil || !strings.Contains(err.Error(), "3 results for 1 states") {
-		t.Fatalf("count mismatch: %v", err)
-	}
-	status = 404
-	if _, err := AskBatch(p, []string{"x"}, nil, qs, 5*time.Second); err != ErrNoBatch {
-		t.Fatalf("want ErrNoBatch, got %v", err)
-	}
-	if (Profile{Batch: 8, Type: TypeOpenAI}).BatchSize() != 0 || (Profile{Batch: 99}).BatchSize() != MaxBatch {
-		t.Fatal("BatchSize")
 	}
 }

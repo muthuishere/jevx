@@ -35,7 +35,7 @@ With `cache` true (the default), jevx keeps what the model said so the same call
 
 ## The ledger
 
-With `ledger` true (the default), every call appends one line to `~/.local/share/jevx/calls.jsonl`: the profile, the caller (the calling agent's working directory, or `JEVX_CALLER`), the host, whether it is hosted, the model, number of questions, a 12-hex-character hash of the question set, latency, token usage, how many items were redacted, the profile type, how many images and (for a native batch) how many inputs the call carried, and an error message if any. It never holds the input, the question text or a header. `JEVX_LEDGER=off` disables it for a shell.
+With `ledger` true (the default), every call appends one line to `~/.local/share/jevx/calls.jsonl`: the profile, the caller (the calling agent's working directory, or `JEVX_CALLER`), the host, whether it is hosted, the model, number of questions, a 12-hex-character hash of the question set, latency, token usage, how many items were redacted, the profile type, how many images the call carried, and an error message if any. It never holds the input, the question text or a header. `JEVX_LEDGER=off` disables it for a shell.
 
 ```json title="~/.local/share/jevx/calls.jsonl (one line)"
 {"host":"api.typesafe.ai","model":"jev-1.13.0","ms":673,"qhash":"b4838021a792","questions":1,"ts":"2026-09-27T16:30:24Z","usage":{"input_tokens":281,"output_tokens":20}}

@@ -564,7 +564,7 @@ Batch (parallel, in input order; a table, --raw for JSONL):
   --images DIR|GLOB one input per image file          --parallel N         concurrent requests
 
 Configure
-  profile list|types|add|use|remove|show   endpoints and the API each speaks (typesafe, cloudflare, openai)
+  profile list|types|add|use|remove|show   endpoints and their type (typesafe, openrouter, cloudflare, vercel, custom)
   question add|list|show|remove            saved questions        defaults   every setting and its source
   context                                  the ## Jev context     cache      the local answer cache
   memory add|index|check|show|list         judge against your own notes
@@ -572,21 +572,24 @@ Agents: install, uninstall, skill, plugin, hook, stats
 
 More: jevx help profiles | images | batch`)
 	case "profiles", "profile", "types":
-		pr(`A profile is one endpoint: url, model, headers (secrets as $VARS, expanded per request) and its type, the API it speaks.
+		pr(`A profile is one endpoint: its type, url, model and headers (secrets as $VARS, expanded per request). jevx keeps the
+profiles; each call hands toolnexus the backend, url, model and headers, and toolnexus builds the request for that type.
 With no config, jevx uses the built-in "jev" profile: TypeSafe's hosted Jev with $TYPESAFE_API_KEY.
 `)
 		cmdProfile([]string{"types"})
 		pr(`
 Examples:
-  jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx
-  jevx profile add cf 'https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/ai/run' --type cloudflare --model typesafe/jev --header 'Authorization: Bearer $CF_API_TOKEN'
-  jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
-  jevx profile use oai          or per call: --profile oai`)
+  jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx        # type typesafe, own url
+  jevx profile add or --type openrouter                                                  # $OPENROUTER_API_KEY
+  jevx profile add cf --type cloudflare                                                  # $CLOUDFLARE_ACCOUNT_ID, $CLOUDFLARE_JEV_API_KEY
+  jevx profile add clef --type cloudflare --model @cf/cloudflare/clef                    # Clef takes images
+  jevx profile use or          or per call: --profile or`)
 	case "images", "image":
-		pr(`Images (PNG or JPEG, up to 16 MB each) go with an input to profiles that take them: type typesafe and openai do;
-cloudflare does not unless the profile sets "images": true (jevx profile add ... --images).
-  typesafe  sent as System One "assets" (image1, image2, ...), named in the state, with the TypeSafe-Danger-Zone-Images header
-  openai    sent as input_image parts (base64 data URLs) next to the text
+		pr(`Images (PNG or JPEG, 280-1568 px per side, up to 16 MiB each and 32 MiB a request) go with an input to profiles that
+take them. toolnexus sends them and checks the limits before any request:
+  typesafe, openrouter  System One "assets" (image1, image2, ...), with the TypeSafe-Danger-Zone-Images header
+  cloudflare            only Clef models (@cf/cloudflare/clef*), as data URLs in input.images
+  vercel, custom        refused, unless the profile sets "images": true (jevx profile add ... --images)
 The image bytes are part of the cache key; they are never redacted, so do not send screenshots of secrets to a hosted endpoint.
 
   jevx is "Is this an error page?" --image shot.png
@@ -601,11 +604,8 @@ A failed input prints its error on stderr and the rest go on; the batch exits 4 
   --states FILE.jsonl   one JSON object (or JSON string) per line
   --images DIR|GLOB|FILE  one input per image; --in gives them all the same text
   --image FILE          attach an image to every input of a --lines / --states batch
-filter and rank are batches too. Each request carries up to "chunk" questions (32; 10 for openai profiles).
-By default each input is one request (through toolnexus), --parallel at a time. A typesafe profile whose server has a
-batch route (openjevx: POST /v1/systemone/batch) can send up to N inputs per request instead:
-  jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx --batch 32
-Without the route jevx says so once and asks one input per request. TypeSafe's hosted API has no batch route.`)
+filter and rank are batches too. Each input is one request through toolnexus carrying up to "chunk" questions (32):
+no backend has a native multi-input request, so the batch is the requests in parallel.`)
 	default:
 		die("no help topic %q: jevx help [profiles | images | batch]", topic)
 	}
@@ -643,9 +643,6 @@ func cmdProfile(args []string) {
 			if p.TakesImages() {
 				img = "  images"
 			}
-			if n := p.BatchSize(); n > 0 {
-				img += fmt.Sprintf("  batch=%d", n)
-			}
 			pr("%s %-10s %-10s %s  model=%s%s%s%s", mark, n, p.Kind(), p.URL, p.Model, img, hs, note)
 		}
 		pr("(* = default; change with: jevx profile use NAME; the types: jevx profile types)")
@@ -659,27 +656,31 @@ func cmdProfile(args []string) {
 	switch args[0] {
 	case "types":
 		for _, t := range core.Types {
-			img := "no"
-			if t.Images {
-				img = "yes"
+			img := map[bool]string{true: "yes", false: "no"}[core.Preset(t.Name, core.Profile{Type: t.Name}).TakesImages()]
+			url, model, key := t.URL, t.Model, "$"+t.KeyEnv
+			if url == "" {
+				url, key = "(required)", "(--header)"
 			}
-			pr("%-11s %s\n%-11s body    %s\n%-11s images  %s   example url  %s\n", t.Name, t.Summary, "", t.Body, "", img, t.URL)
+			pr("%-11s %s\n%-11s url %s\n%-11s model %s   key %s   images %s\n", t.Name, t.Summary, "", url, "", model, key, img)
 		}
-		pr("add one: jevx profile add NAME URL --type TYPE --model M [--header 'Authorization: Bearer $VAR']   (default type: typesafe)")
+		pr("add one: jevx profile add NAME [URL] --type TYPE [--model M] [--header 'Authorization: Bearer $VAR']")
+		pr("  the url, model and key above are used when not given; default type: typesafe. toolnexus %s sends every request.", toolnexusVersion())
 		pr("images: --image FILE / --images DIR go only to a profile that takes them; override per profile with --images / --no-images")
 		return
 	case "add":
-		need(3, "add NAME URL [--type typesafe|cloudflare|openai] [--model M] [--header 'K: V' ...] [--questions FILE]")
+		need(2, "add NAME [URL] [--type typesafe|openrouter|cloudflare|vercel|custom] [--model M] [--header 'K: V' ...] [--questions FILE]")
+		url, rest := "", args[2:]
+		if len(rest) > 0 && !strings.HasPrefix(rest[0], "-") {
+			url, rest = rest[0], rest[1:]
+		}
 		fs := flag.NewFlagSet("profile add", flag.ExitOnError)
-		m, q := fs.String("model", "default", "model name"), fs.String("questions", "", "question pack JSON")
+		m, q := fs.String("model", "", "model name (default: the type's)"), fs.String("questions", "", "question pack JSON")
 		st := fs.String("type", "", "the API the endpoint speaks: "+core.TypeNames()+" (default typesafe; jevx profile types)")
 		fs.StringVar(st, "style", "", "legacy name for --type")
-		nb := fs.Int("batch", 0, "native batch: send up to N inputs per request to the server's batch route (typesafe only; max 50)")
-		bu := fs.String("batch-url", "", "the batch route (default: URL + /batch)")
 		imgOn, imgOff := fs.Bool("images", false, "this endpoint takes images even if its type does not by default"), fs.Bool("no-images", false, "never send images to this endpoint")
 		var hdr multi
 		fs.Var(&hdr, "header", `request header "Name: value" (repeat); reference env vars for secrets: "Authorization: Bearer $JEV_API_KEY"`)
-		_ = fs.Parse(args[3:])
+		_ = fs.Parse(rest)
 		hm := map[string]string{}
 		for _, h := range hdr {
 			k, v, ok := strings.Cut(h, ":")
@@ -689,18 +690,15 @@ func cmdProfile(args []string) {
 			hm[strings.TrimSpace(k)] = strings.TrimSpace(v)
 		}
 		if *st == "" {
-			*st = core.Profile{URL: args[2]}.Kind() // a Cloudflare /ai/run url is recognised; otherwise typesafe
+			*st = core.Profile{URL: url}.Kind() // a Cloudflare, OpenRouter or Vercel url is recognised; otherwise typesafe
 		}
 		if _, ok := core.LookupType(*st); !ok {
 			die("--type: want one of %s, got %q (jevx profile types)", core.TypeNames(), *st)
 		}
-		np := core.Profile{URL: args[2], Model: *m, Headers: hm, Questions: *q, Type: *st, Batch: *nb, BatchEndpoint: *bu}
-		if *nb > 0 && *st != core.TypeTypeSafe {
-			die("--batch: only a typesafe profile has a native batch route; %s profiles ask one input per request", *st)
+		if url == "" && *st == core.TypeCustom {
+			die("a custom profile needs its URL: jevx profile add %s URL --type custom", args[1])
 		}
-		if *nb > core.MaxBatch {
-			die("--batch: at most %d inputs per request", core.MaxBatch)
-		}
+		np := core.Preset(*st, core.Profile{URL: url, Model: *m, Headers: hm, Questions: *q, Type: *st})
 		switch {
 		case *imgOn && *imgOff:
 			die("give --images or --no-images, not both")

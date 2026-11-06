@@ -2,7 +2,6 @@ package core
 
 import (
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -11,6 +10,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	tn "github.com/muthuishere/toolnexus/golang"
 )
 
 // Image is one picture sent with an input. Images travel inline (base64), never as a URL jevx fetches; the file is
@@ -22,8 +23,8 @@ type Image struct {
 	Data   []byte
 }
 
-// MaxImageBytes is the per-image size jevx accepts before sending (TypeSafe documents 16 MiB).
-const MaxImageBytes = 16 << 20
+// MaxImageBytes is the per-image size jevx reads (toolnexus checks it again, with the pixel limits).
+const MaxImageBytes = tn.ClassifierImageMaxBytes
 
 // LoadImage reads a PNG or JPEG file (detected from its bytes, not its name).
 func LoadImage(path string) (Image, error) {
@@ -100,20 +101,6 @@ func ImageFiles(src string) ([]string, error) {
 	return m, nil
 }
 
-// DataURL is the image as a data: URL (the OpenAI input_image form).
-func (im Image) DataURL() string {
-	return "data:image/" + im.Format + ";base64," + base64.StdEncoding.EncodeToString(im.Data)
-}
-
-// asset is the image as a System One asset.
-func (im Image) asset() map[string]any {
-	f := im.Format
-	if f == "jpeg" {
-		f = "jpg"
-	}
-	return map[string]any{"type": "image", "format": f, "data_base64": base64.StdEncoding.EncodeToString(im.Data)}
-}
-
 // ImageDigest identifies the images' bytes and names for the cache key ("" for none).
 func ImageDigest(imgs []Image) string {
 	if len(imgs) == 0 {
@@ -127,39 +114,28 @@ func ImageDigest(imgs []Image) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// WithImageRefs names the images in the state, right after the item, for the types that send images as assets: a
-// System One server rejects an asset the state never mentions. A JSON state gets an "images" field; text gets one
-// "Image: image1" line (or "Images: image1, image2"). The OpenAI type sends images as message parts and needs no name.
-func WithImageRefs(p Profile, state string, imgs []Image) string {
-	if len(imgs) == 0 || p.Kind() == TypeOpenAI {
+// ImageState is the state toolnexus is given: the text alone, or the text followed by each image as a toolnexus
+// ContentPart. toolnexus moves every image into the request's assets under its own name, checks TypeSafe's limits
+// (PNG/JPEG, 280-1568 px per side, 16 MiB each, 32 MiB a request) and adds the opt-in header where the backend
+// needs it. A JSON object state keeps its shape and gets the images under "images".
+func ImageState(state string, imgs []Image) any {
+	if len(imgs) == 0 {
 		return state
 	}
-	var names []string
+	parts := make([]any, 0, len(imgs))
 	for _, im := range imgs {
-		names = append(names, im.Name)
+		parts = append(parts, tn.Bytes(im.Data, "image/"+im.Format))
 	}
 	trimmed := strings.TrimSpace(state)
 	var obj map[string]any
-	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") && json.Unmarshal([]byte(trimmed), &obj) == nil {
+	if strings.HasPrefix(trimmed, "{") && json.Unmarshal([]byte(trimmed), &obj) == nil {
 		if _, taken := obj["images"]; !taken {
-			nb, _ := json.Marshal(names)
-			body := strings.TrimSpace(strings.TrimSuffix(trimmed, "}"))
-			sep := ","
-			if strings.HasSuffix(body, "{") {
-				sep = ""
-			}
-			return body + sep + `"images":` + string(nb) + "}"
+			obj["images"] = parts
+			return obj
 		}
 	}
-	label := "Image: "
-	if len(names) > 1 {
-		label = "Images: "
+	if trimmed == "" { // an image-only input
+		return parts
 	}
-	if trimmed == "" {
-		return label + strings.Join(names, ", ")
-	}
-	return state + "\n" + label + strings.Join(names, ", ")
+	return append([]any{state}, parts...)
 }
-
-// ImagesHeader is the opt-in header TypeSafe asks for on a request that carries images.
-const ImagesHeader = "TypeSafe-Danger-Zone-Images"

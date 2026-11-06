@@ -38,10 +38,10 @@ func TestAskRawValidates(t *testing.T) {
 	}{
 		{"ok noul", noulQ, `{"answers":{"q":{"type":"noul","noul":0.9}}}`, ""},
 		{"missing answer", noulQ, `{"answers":{"x":{"type":"noul","noul":0.9}}}`, "no answer"},
-		{"extra answer", noulQ, `{"answers":{"q":{"type":"noul","noul":0.9},"z":{"type":"noul","noul":0.1}}}`, "2 answers"},
-		{"noul out of range", noulQ, `{"answers":{"q":{"type":"noul","noul":1.4}}}`, "probability"},
+		{"extra answer", noulQ, `{"answers":{"q":{"type":"noul","noul":0.9},"z":{"type":"noul","noul":0.1}}}`, "unexpected answer"},
+		{"noul out of range", noulQ, `{"answers":{"q":{"type":"noul","noul":1.4}}}`, "outside [0,1]"},
 		{"probs do not sum", choiceQ, `{"answers":{"c":{"type":"choice","choice":"a","probabilities":{"a":0.9,"b":0.5}}}}`, "sum"},
-		{"unknown key", choiceQ, `{"answers":{"c":{"type":"choice","choice":"zz","probabilities":{"a":0.5,"b":0.5}}}}`, "not an offered key"},
+		{"unknown key", choiceQ, `{"answers":{"c":{"type":"choice","choice":"zz","probabilities":{"a":0.5,"b":0.5}}}}`, "was not offered"},
 		{"garbage", noulQ, `not json`, "unreadable"},
 	}
 	for _, c := range cases {

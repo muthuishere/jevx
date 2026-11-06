@@ -1,6 +1,6 @@
 ---
 name: jevx
-description: Fast yes/no, pick-one and rating judgements from a Jev-style decision model (TypeSafe System One, Cloudflare Workers AI or the OpenAI Decisions API), about text or images, instead of reasoning them out yourself. Use when you must classify, filter, triage, route, dedupe, rank or check many items (files, lines, tickets, messages, records, screenshots, photos), when a branch in your work depends on meaning ("is this urgent", "which team owns this"), when you are about to ask the user to pick between options, and before handing back a turn. Trigger: is this X, which of these, triage, classify, filter these, rank these, would the user accept this, what would the user pick, ask jev.
+description: Fast yes/no, pick-one and rating judgements from a Jev-style decision model (TypeSafe, OpenRouter, Cloudflare Workers AI, Vercel or a self-hosted System One endpoint), about text or images, instead of reasoning them out yourself. Use when you must classify, filter, triage, route, dedupe, rank or check many items (files, lines, tickets, messages, records, screenshots, photos), when a branch in your work depends on meaning ("is this urgent", "which team owns this"), when you are about to ask the user to pick between options, and before handing back a turn. Trigger: is this X, which of these, triage, classify, filter these, rank these, would the user accept this, what would the user pick, ask jev.
 ---
 
 # jevx: judgements in milliseconds
@@ -62,8 +62,9 @@ jevx filter "Does this photo show a damaged package?" --images ./returns/  # bat
 jevx ask --images 'shots/*.png' --in "Checkout page" --choice state="Which state?|ok=works;error=error shown;blank=blank page"
 ```
 - Images go only to profiles that take them: type `typesafe` (the default; needs an image-capable model such as
-  jev-1.14.0, which TypeSafe calls a "danger zone" feature, not for production) and `openai`. A `cloudflare` profile
-  refuses them with exit 4 and says so; do not retry, tell the user or use another profile (`jevx profile list`).
+  jev-1.14.0, which TypeSafe calls a "danger zone" feature, not for production), `openrouter`, and Clef models on
+  `cloudflare`. Others refuse them with exit 4 and say so; do not retry, tell the user or use another profile
+  (`jevx profile list`). An image under 280 px or over 1568 px a side is refused too.
 - Write the question about what is visible: "Does the screenshot show an error dialog?" beats "Is it broken?".
 - Images are **not redacted** before a hosted call. Never send a screenshot that shows keys, passwords or personal data.
 - `--images` takes a folder, a glob or a file listing paths; `--in` gives every image the same text. `--image` with
@@ -71,14 +72,12 @@ jevx ask --images 'shots/*.png' --in "Checkout page" --choice state="Which state
 
 ## Profiles: which API answers
 
-Every request goes through toolnexus's System One client; you never call an endpoint yourself.
-
-Each profile has a `type`: `typesafe` (System One / Jev, the default and the built-in `jev` profile), `cloudflare`
-(Workers AI `/ai/run`) or `openai` (OpenAI Decisions API, `/v1/decisions`). Questions and verdicts are the same for all
-three; jevx converts the request and the reply. `jevx profile list` shows each profile's type and whether it takes
-images; `jevx help profiles` explains the types. Use `--profile NAME` only for a profile the user already set up; do not
-add one unasked. A profile listed with `batch=N` sends up to N inputs per request in a batch (openjevx's batch route), so
-a 1000-line `filter` there is ~32 requests, not 1000; otherwise prefer `--lines` / `--images` over a shell loop anyway.
+Every request goes through toolnexus's classifier; you never call an endpoint yourself. Each profile has a `type`, the
+toolnexus backend that answers it: `typesafe` (the default and the built-in `jev` profile), `openrouter`, `cloudflare`
+(Workers AI `/ai/run`), `vercel` or `custom` (a self-hosted server). Questions and verdicts are the same for all of them.
+`jevx profile list` shows each profile's type and whether it takes images; `jevx help profiles` explains the types.
+Use `--profile NAME` only for a profile the user already set up; do not add one unasked. A batch is one request per
+input, run in parallel, so prefer `--lines` / `--images` over a shell loop.
 
 ## Judge against the user's notes: `--memory`
 
@@ -163,7 +162,7 @@ current directory unless you pass `--cwd DIR`.
 | `yes` / `no` | 0.8 / 0.2 | a noul P at or above `yes` is yes, at or below `no` is no, anything between is unsure |
 | `min_confidence` | 0.6 | a choice or score below this is unsure |
 | `parallel` | 8 | concurrent requests in a batch |
-| `retries` / `timeout_s` / `chunk` | 3 / 60 / 32 | tries on 429/5xx, seconds per request, questions per request (10 for an `openai` profile) |
+| `retries` / `timeout_s` / `chunk` | 3 / 60 / 32 | tries on 429/5xx, seconds per request, questions per request |
 | `ledger` | true | log each call without content to `~/.local/share/jevx/calls.jsonl` (`jevx stats`); a hosted call is scrubbed of secrets, emails and phones first |
 | `cache` / `cache_ttl_days` | true / 7 | reuse a stored answer for the same endpoint, model, input and question; `--fresh` on a call asks again; `jevx cache enable\|disable\|clear` |
 | `accept_min` / `more_max` | 0.35 / 0.65 | legacy Stop hook thresholds (the `stop-judge` plugin has its own condition) |
@@ -240,7 +239,7 @@ skill works but plugins do not run yet.
 curl -fsSL https://muthuishere.github.io/jevx/install.sh | sh      # this skill for Claude Code, Codex and ~/.agents
 export TYPESAFE_API_KEY=...   # the user's key: hosted Jev works with no config at all
 jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # only for a custom endpoint (a local openjevx here)
-jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
+jevx profile add or --type openrouter      # another backend: its url, model and key variable ($OPENROUTER_API_KEY)
 ```
 `jevx help` lists every command; `jevx help profiles | images | batch` go deeper.
 If a call exits 4 asking for `TYPESAFE_API_KEY` (or another variable), tell the user which variable to set. Do not

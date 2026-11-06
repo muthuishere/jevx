@@ -58,11 +58,9 @@ An illustrative file with every top-level field (values are examples, not defaul
 | `url` | the System One endpoint |
 | `model` | the model name sent with each request |
 | `headers` | header name → value; `$VAR` / `${VAR}` expanded per request |
-| `type` | the API the endpoint speaks: `typesafe` (the flat System One body, the default), `cloudflare` (a `{model, input}` envelope whose `{result, success}` reply is unwrapped; a failed envelope is an error with Cloudflare's message) or `openai` (the OpenAI Decisions API: questions as a list, answers read back by name). Empty means `typesafe`, except that a URL containing `/ai/run` is treated as `cloudflare`. Set it with `jevx profile add NAME URL --type openai`; the older `style` field and `--style` flag are still read. |
-| `images` | `true` / `false`: whether `--image` / `--images` may be sent to this endpoint. Unset: the type decides (typesafe and openai yes, cloudflare no). |
+| `type` | the toolnexus classifier backend that answers: `typesafe` (the default), `openrouter`, `cloudflare` (Workers AI `/ai/run`; toolnexus wraps the request in `{model, input}` and unwraps the `{success, result}` reply), `vercel` or `custom`. Empty means `typesafe`, except that a URL containing `/ai/run`, `openrouter.ai` or `ai-gateway.vercel.sh` sets its type. Set it with `jevx profile add NAME [URL] --type cloudflare`; the older `style` field and `--style` flag are still read. |
+| `images` | `true` / `false`: whether `--image` / `--images` may be sent to this endpoint. Unset: toolnexus's support table decides (typesafe and openrouter yes, cloudflare only for Clef models, vercel and custom no). |
 | `style` | legacy name for `type`. |
-| `batch` | native batch: up to this many inputs per request (at most 50) to the server's batch route; `typesafe` profiles only. Unset: one request per input. See [Native batch](/jevx/guides/ask/#native-batch). |
-| `batch_url` | where native batches go; default `url` + `/batch`. |
 | (Cloudflare) | Cloudflare needs an AI Gateway balance or BYOK (bring your own key) on the account; without one it answers HTTP 402, which jevx reports as an error (exit `4`). |
 | `questions` | optional question pack (JSON) for `judge` |
 | `defaults` | settings that apply only when this profile is used |

@@ -39,12 +39,12 @@ jevx: usage: jevx rank "QUESTION"|NAME ...  (see: jevx help)
 | `defaults [show]\|set\|unset` | every setting, its value and where it comes from | [Settings](/jevx/reference/settings/) |
 | `memory add\|index\|check\|show\|list` | a folder of cited markdown notes for `ask --memory`: register, index, check freshness, preview retrieval | [Memory](/jevx/guides/memory/) |
 | `cache [stat]\|enable\|disable\|ttl DAYS\|dir [PATH]\|clear` | the answer cache: status, switch it on or off, set how long answers live, move it, or delete everything (also `config cache …`) | [Privacy](/jevx/reference/privacy/#the-answer-cache) |
-| `profile list\|types\|add\|use\|remove\|show` | endpoints and the API each speaks (`--type typesafe\|cloudflare\|openai`) | [Images and profile types](/jevx/guides/images/) |
+| `profile list\|types\|add\|use\|remove\|show` | endpoints and the toolnexus backend each uses (`--type typesafe\|openrouter\|cloudflare\|vercel\|custom`) | [Images and profile types](/jevx/guides/images/) |
 
 ```text title="usage lines"
 jevx: usage: jevx question add NAME --noul "QUESTION" | --choice "QUESTION|k=desc;k2=desc" | --score "QUESTION|low;mid;high" [--yes 0.85 --no 0.15 --min 0.6]
 jevx: usage: jevx defaults [show] | set KEY VALUE | unset KEY  [--profile P]   keys: yes, no, min_confidence, parallel, retries, timeout_s, chunk, ledger, accept_min, more_max, cache, cache_ttl_days
-jevx: usage: jevx profile add NAME URL [--type typesafe|cloudflare|openai] [--model M] [--header 'K: V' ...] [--questions FILE]
+jevx: usage: jevx profile add NAME [URL] [--type typesafe|openrouter|cloudflare|vercel|custom] [--model M] [--header 'K: V' ...] [--questions FILE]
 ```
 
 ## Hooks and plugins

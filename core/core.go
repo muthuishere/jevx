@@ -5,7 +5,6 @@ package core
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	_ "embed"
 	"encoding/hex"
@@ -13,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -74,19 +72,17 @@ func expand(p string) string {
 // Profile is one endpoint: url, model and request headers. Secrets are never stored: a header value names an env var
 // ("Bearer $JEV_API_KEY") that is expanded only when a request is sent.
 type Profile struct {
-	URL           string            `json:"url"`
-	Model         string            `json:"model"`
-	Type          string            `json:"type,omitempty"`      // the API it speaks: typesafe (System One, the default) | cloudflare | openai (jevx profile types)
-	Images        *bool             `json:"images,omitempty"`    // whether images may be sent; unset: the type's default
-	Style         string            `json:"style,omitempty"`     // legacy name for type (typesafe | cloudflare)
-	Batch         int               `json:"batch,omitempty"`     // native batch: states per POST {url}/batch (typesafe only; 0 = one request per input)
-	BatchEndpoint string            `json:"batch_url,omitempty"` // where native batches go; default url + "/batch"
-	Headers       map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
-	Questions     string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
-	Note          string            `json:"note,omitempty"`
-	Endpoint      string            `json:"endpoint,omitempty"` // legacy name for url
-	KeyEnv        string            `json:"key_env,omitempty"`  // legacy: same as headers {"Authorization": "Bearer $KEY_ENV"}
-	Defaults      Settings          `json:"defaults,omitempty"` // overrides the global defaults for this profile
+	URL       string            `json:"url"`
+	Model     string            `json:"model"`
+	Type      string            `json:"type,omitempty"`      // the toolnexus backend that answers: typesafe (the default) | openrouter | cloudflare | vercel | custom
+	Images    *bool             `json:"images,omitempty"`    // whether images may be sent; unset: the type's default
+	Style     string            `json:"style,omitempty"`     // legacy name for type (typesafe | cloudflare)
+	Headers   map[string]string `json:"headers,omitempty"`   // values may reference env vars ("Bearer $JEV_API_KEY"), expanded per request
+	Questions string            `json:"questions,omitempty"` // optional question pack (JSON) for a model trained on specific wording
+	Note      string            `json:"note,omitempty"`
+	Endpoint  string            `json:"endpoint,omitempty"` // legacy name for url
+	KeyEnv    string            `json:"key_env,omitempty"`  // legacy: same as headers {"Authorization": "Bearer $KEY_ENV"}
+	Defaults  Settings          `json:"defaults,omitempty"` // overrides the global defaults for this profile
 }
 
 // Settings are every tunable knob. Unset fields fall back: flag > profile defaults > config defaults > Builtin.
@@ -155,14 +151,7 @@ func (s Settings) Over(o Settings) Settings {
 }
 
 // Settings resolves the effective settings for a profile: Builtin < config defaults < profile defaults.
-// A profile type with a smaller question limit (openai: 10) lowers chunk below the config defaults.
-func (c Config) Settings(p Profile) Settings {
-	var typed Settings
-	if t, ok := LookupType(p.Kind()); ok && t.Chunk > 0 {
-		typed.Chunk = ip(t.Chunk)
-	}
-	return Builtin.Over(typed).Over(c.Defaults).Over(p.Defaults)
-}
+func (c Config) Settings(p Profile) Settings { return Builtin.Over(c.Defaults).Over(p.Defaults) }
 
 // Question is a named, reusable question: a System One question plus its own thresholds (optional).
 type Question struct {
@@ -766,18 +755,19 @@ func AskRaw(p Profile, state string, qs map[string]any, timeout time.Duration) (
 	return AskImages(p, state, nil, qs, timeout)
 }
 
-// AskImages is AskRaw with images: sent as System One assets (typesafe, cloudflare) or input_image parts (openai).
-// The state must already name them (WithImageRefs). A profile that does not take images is refused before any call.
-// The request goes through a toolnexus Classifier (backend.go); jevx keeps redaction, validation and the ledger.
+// AskImages is AskRaw with images, which toolnexus sends the way the profile's backend takes them.
+// A profile that does not take images is refused before any call.
+// The request goes through a toolnexus Classifier (backend.go), which validates the reply; jevx keeps redaction
+// and the ledger.
 func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout time.Duration) (map[string]Answer, []byte, error) {
-	kind := p.Kind()
 	if len(imgs) > 0 && !p.TakesImages() {
-		return nil, nil, fmt.Errorf("this profile (type %s) does not take images; use a typesafe or openai profile, or set \"images\": true on it if its model does", kind)
+		return nil, nil, fmt.Errorf("this profile (type %s, model %s) does not take images; use a typesafe or openrouter profile, or set \"images\": true on it if its model does", p.Kind(), p.Model)
 	}
 	if MissingEnv(p.Norm()) != "" {
 		return nil, nil, ErrNeedKey
 	}
-	headers := p.Norm().Headers // toolnexus expands $VARs itself, at call time; expanding twice would mangle a "$" in a value
+	send := p.Norm() // toolnexus expands $VARs at call time; jevx only expands the model and pins ${VAR} in the URL
+	send.Model, send.URL = os.ExpandEnv(send.Model), envRef.ReplaceAllString(send.URL, "${$1}")
 	p = p.Expanded()
 	// Before any HOSTED call, scrub secrets, emails and phones from the state and question text (CEO 2026-10-03).
 	redacted := 0
@@ -791,80 +781,13 @@ func AskImages(p Profile, state string, imgs []Image, qs map[string]any, timeout
 		NoteRedacted(kinds)
 	}
 	t0 := time.Now()
-	raw, err := evaluate(p, headers, kind, sendState, imgs, qs, sendQs, timeout)
-	var out struct {
-		Model   string            `json:"model"`
-		Answers map[string]Answer `json:"answers"`
-		Usage   map[string]any    `json:"usage"`
-	}
-	if err == nil {
-		if e := json.Unmarshal(raw, &out); e != nil {
-			err = fmt.Errorf("unreadable answer: %v", e)
-		} else {
-			err = validate(qs, out.Answers)
-		}
-	}
-	ledger(p, qs, out.Model, out.Usage, time.Since(t0), err, redacted, len(imgs))
+	ans, raw, d, err := evaluate(send, sendState, imgs, sendQs, timeout)
+	usage := map[string]any{"input_tokens": d.Usage.InputTokens, "output_tokens": d.Usage.OutputTokens}
+	ledger(p, qs, d.Model, usage, time.Since(t0), err, redacted, len(imgs))
 	if err != nil {
 		return nil, nil, err
 	}
-	return out.Answers, raw, nil
-}
-
-func post(p Profile, body []byte, timeout time.Duration) ([]byte, bool, error) {
-	req, _ := http.NewRequest("POST", p.URL, bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	for k, v := range p.Headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := (&http.Client{Timeout: timeout}).Do(req)
-	if err != nil {
-		return nil, true, err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode/100 != 2 {
-		t := strings.TrimSpace(string(raw))
-		return nil, resp.StatusCode == 429 || resp.StatusCode >= 500, fmt.Errorf("%s: HTTP %d: %s", p.URL, resp.StatusCode, t[:min(300, len(t))])
-	}
-	return raw, false, nil
-}
-
-// validate fails closed: every question answered and nothing extra, probabilities in [0,1] summing to ~1, a choice
-// that is one of the offered keys.
-func validate(qs map[string]any, ans map[string]Answer) error {
-	if len(ans) != len(qs) {
-		return fmt.Errorf("invalid answer: %d answers for %d questions", len(ans), len(qs))
-	}
-	for k, q := range qs {
-		a, ok := ans[k]
-		if !ok {
-			return fmt.Errorf("invalid answer: no answer for %q", k)
-		}
-		if pr := a.P(); a.Type == "noul" && (pr < 0 || pr > 1) {
-			return fmt.Errorf("invalid answer: %q probability %v", k, pr)
-		}
-		if len(a.Probabilities) > 0 {
-			sum := 0.0
-			for _, v := range a.Probabilities {
-				if v < 0 || v > 1 {
-					return fmt.Errorf("invalid answer: %q probability %v", k, v)
-				}
-				sum += v
-			}
-			if sum < 0.98 || sum > 1.02 {
-				return fmt.Errorf("invalid answer: %q probabilities sum to %.3f", k, sum)
-			}
-		}
-		if a.Type == "choice" {
-			if crit, _ := q.(map[string]any)["criteria"].(map[string]string); crit != nil {
-				if _, ok := crit[a.Choice]; !ok {
-					return fmt.Errorf("invalid answer: %q chose %q, not an offered key", k, a.Choice)
-				}
-			}
-		}
-	}
-	return nil
+	return ans, raw, nil
 }
 
 // ledger appends one JSON line per call to ~/.local/share/jevx/calls.jsonl: profile, caller (the calling agent's cwd,
@@ -872,11 +795,6 @@ func validate(qs map[string]any, ans map[string]Answer) error {
 // redacted, how many images were sent, error.
 // Never the state, the question text or a header. JEVX_LEDGER=off disables it.
 func ledger(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted, images int) {
-	ledgerBatch(p, qs, model, usage, d, err, redacted, images, 0)
-}
-
-// ledgerBatch is ledger for a native batch: states is how many inputs the one call carried (0: not a batch).
-func ledgerBatch(p Profile, qs map[string]any, model string, usage map[string]any, d time.Duration, err error, redacted, images, states int) {
 	if !LedgerOn || firstEnv("JEVX_LEDGER", "JEVCLI_LEDGER") == "off" {
 		return
 	}
@@ -891,9 +809,6 @@ func ledgerBatch(p Profile, qs map[string]any, model string, usage map[string]an
 		"profile": ActiveProfile, "caller": Caller(), "hosted": Hosted(p), "redacted": redacted, "type": p.Kind()}
 	if images > 0 {
 		row["images"] = images
-	}
-	if states > 0 {
-		row["states"] = states
 	}
 	if err != nil {
 		row["error"] = trimErr(err.Error())

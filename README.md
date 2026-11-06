@@ -29,10 +29,9 @@ number or a key, never prose. The agent keeps its reasoning for the real work.
 5. **Repeat calls are free.** Answers are cached on your machine (a hash-keyed file each, never the input), so the same
    call again returns in milliseconds and costs nothing. `--fresh` asks again; `jevx cache enable|disable|clear`.
 6. **Any endpoint, nothing hidden.** Any System One URL works (keys stay in environment variables, expanded only when a
-   request is sent), and Cloudflare and OpenAI profiles too. Requests go through
-   [toolnexus](https://github.com/muthuishere/toolnexus)'s System One client; replies are validated, 429/5xx are retried,
-   and every call is logged without its content. A self-hosted server with a batch route (openjevx) takes up to 50 inputs
-   per request with `--batch N`.
+   request is sent): TypeSafe, OpenRouter, Cloudflare Workers AI, Vercel or your own server. Requests go through
+   [toolnexus](https://github.com/muthuishere/toolnexus)'s classifier; replies are validated, 429/5xx are retried, and every
+   call is logged without its content.
 
 ## Jev, for your day-to-day work
 
@@ -65,12 +64,12 @@ export TYPESAFE_API_KEY=...        # from console.typesafe.ai/keys; read at requ
 ```
 
 Running your own System One endpoint (self-hosted, a local model, another provider)? Add a profile for it. A profile's
-`--type` is the API it speaks: `typesafe` (System One, the default), `cloudflare` (Workers AI) or `openai` (the OpenAI
-Decisions API); `jevx profile types` lists them.
+`--type` is the toolnexus backend that answers it: `typesafe` (the default), `openrouter`, `cloudflare`, `vercel` or
+`custom`; with no URL a type brings its own endpoint, model and key variable. `jevx profile types` lists them.
 
 ```bash
 jevx profile add openjevx http://127.0.0.1:21160/v1/systemone --model openjevx   # openjevx's default port (v0.5.11+); then --profile openjevx
-jevx profile add oai https://api.openai.com/v1/decisions --type openai --model gpt-6-luna --header 'Authorization: Bearer $OPENAI_API_KEY'
+jevx profile add cf --type cloudflare                                             # $CLOUDFLARE_ACCOUNT_ID, $CLOUDFLARE_JEV_API_KEY
 ```
 
 ## Quickstart
@@ -124,7 +123,7 @@ yes      0.98  FATAL db connection refused
 ## Images
 
 `--image FILE` sends a screenshot or photo (PNG/JPEG) with the question; `--images DIR|GLOB` is a parallel batch with one
-input per image. typesafe and openai profiles take images; a cloudflare profile refuses them unless it opts in.
+input per image. typesafe and openrouter profiles take images, and Clef on Cloudflare; the others refuse them unless the profile opts in.
 
 ```console
 $ jevx is "Is an error message shown?" --image checkout.png
